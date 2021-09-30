@@ -9,6 +9,9 @@ import BiometricPopup from './BiometricPopup'
 import SignUpBiometric from './SignUpBiometric'
 import * as Keychain from 'react-native-keychain';
 import FingerprintScanner from 'react-native-fingerprint-scanner';
+import Register from '../registration/Register';
+import { resolve } from 'path';
+import { rejects } from 'assert/strict';
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
@@ -20,6 +23,9 @@ export default function Login({ navigation }) {
     const [BTstate, setBtstate] = useState();
     const [services, setServices] = useState([new Service()]);
     const [biometricVisibility, setBiometricVisibilty] = useState(false);
+    const [biometric_signup,setBiometricSignup] = useState({res:null,value:""});
+    const [manager_status, setMangerStatus] = useState('idle');
+
 
 
     useEffect(() => {
@@ -49,9 +55,13 @@ export default function Login({ navigation }) {
         await manager.startDeviceScan(null, null, (error, device) => {
 
             console.log("scanning");
+            setMangerStatus('scanning');
+
             if (error) {
                 console.log('ScanAndConnect error ============' + error.message);
                 manager.stopDeviceScan();
+                setMangerStatus('idle');
+
                 return;
             }
 
@@ -60,20 +70,23 @@ export default function Login({ navigation }) {
                 console.log("Device ID = " + device.id);
             }
             manager.stopDeviceScan();
+            setMangerStatus('idle');
+
         });
 
     }
 
     async function ConnectToDevice(id) {
         console.log('connecting..');
-
         await manager.connectToDevice(id, { autoConnect: true })
             .then((d) => {
                 (async () => {
+                    setMangerStatus('connected');
                     console.log("discover services....");
                     d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
                     const serv = await manager.servicesForDevice(id)
                     setDevice(d);
+
                     setServices(serv);
                     //console.log("serv 2 ==== ", serv[2]);
 
@@ -101,13 +114,13 @@ export default function Login({ navigation }) {
                     "username": username,
                     "password": password
                 }
-                console.log("DATA TO SEND =====",JSON.stringify(data));
+                console.log("DATA TO SEND =====", JSON.stringify(data));
                 let msg = encoder.encode(JSON.stringify(data));
                 res.forEach(element => {
                     console.log(element.uuid);
                 });
                 let user_data_char = res.find(c => c.uuid === char_uuid);
-                
+
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
                     .then(res => {
@@ -139,6 +152,7 @@ export default function Login({ navigation }) {
     async function RegisterBiometric(data) {
 
         let response;
+        let return_value;
         let char_uuid = "a0b10005-e8f2-537e-4f6c-d104768a1214";
         let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
         let auth_service = services.find(s => s.uuid === auth_service_uuid)
@@ -151,36 +165,42 @@ export default function Login({ navigation }) {
         await auth_service.characteristics().then(
             res => {
 
-
-                console.log(JSON.stringify(data));
                 let msg = encoder.encode(JSON.stringify(data));
                 let user_data_char = res.find(c => c.uuid === char_uuid);
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
                     .then(res => {
-                        console.log("Char IS Readable ==", user_data_char.isReadable);
 
                         user_data_char.read().then(res => {
                             response = base64.decode(res.value);
                             console.log("user_data_char.read()=====", response);
                         }).finally(() => {
+
                             console.log("LOG FORM FINALLY AFTER READ", response);
+
                             if (response === "true") {
                                 console.log("LOGIN SUCCESS");
-                                return { res: true, value: "" };
+                                setBiometricSignup({ res: true, value: "" })
                             }
                             else {
                                 console.log(response, " INCORRECT");
-                                return { res: false, value: response };
+                                setBiometricSignup({ res: false, value: response });
                             }
+
                         })
 
-                    }).catch(err => { console.log("CATCH WRITE DATE  ", err); });
+                    }).catch(err => {
+                        setBiometricSignup({ res: false, value: "CATCH WRITE DATE" });
+                        console.log("CATCH WRITE DATE  ", err);
+                    });
                 //setCharacteristics(res)
 
-            }).catch(err => { console.log("CATCH CHARS ERR ======== ", err) });
+            }).catch(err => {
+                setBiometricSignup({ res: false, value: "CATCH CHARS ERR" });
+                console.log("CATCH CHARS ERR ======== ", err)
+            });
 
-        return { res: false, value: "server" };
+
     }
 
     async function SetCredentials() {
@@ -193,12 +213,15 @@ export default function Login({ navigation }) {
 
     function Disconnect() {
         console.log('disconect');
+
+
         if (device === null) {
             console.log("device undifined");
             return;
         }
         try {
             device.cancelConnection().catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
+            setMangerStatus('idle');
 
         } catch (error) {
             console.log("CATCH dissconect error =======" + JSON.stringify(error));
@@ -208,19 +231,47 @@ export default function Login({ navigation }) {
     function IsDeviceConnected() {
         console.log("IsDeviceConnected function");
         if (!device)
-            return (<View></View>)
-        if (device.isConnected()) {
+            return (<Text>no device</Text>)
+
+
+        if (manager_status == "connected") {
             return (
                 <View>
-                    {/* <Button title="Add fingerprint" onPress={SetCredentials} /> */}
+                    <Button title="Add fingerprint" onPress={SetCredentials} />
                     <Button title="disconnect" onPress={Disconnect} />
                     <SignUpBiometric
-                        SignUp={SignUpBiometric}
+                        SignUp={RegisterBiometric}
+                        signUpValue = {biometric_signup}
                         visibility={biometricVisibility}
                         setVisibilty={setBiometricVisibilty} />
                 </View>
             )
+        } else if (manager_status == "scanning") {
+            return (<Text>scanning</Text>)
+        } else {
+            return (<Text>waiting for connect</Text>)
         }
+
+
+                // device.isConnected().then(res => {
+        //     console.log("is device connected ===", res);
+        //     if (res) {
+        //         return (
+        //             <View>
+        //                 <Button title="Add fingerprint" onPress={SetCredentials} />
+        //                 <Button title="disconnect" onPress={Disconnect} />
+        //                 <SignUpBiometric
+        //                     SignUp={SignUpBiometric}
+        //                     visibility={biometricVisibility}
+        //                     setVisibilty={setBiometricVisibilty} />
+        //             </View>
+        //         )
+        //     }
+        //     else {
+        //         return (<Text>waiting for connect</Text>)
+        //     }
+        // })
+
     }
 
     return (
@@ -245,7 +296,7 @@ export default function Login({ navigation }) {
                 SignUp={SignUpBiometric}
                 visibility={biometricVisibility}
                 setVisibilty={setBiometricVisibilty} /> */}
-            {this.IsDeviceConnected()}
+            {IsDeviceConnected()}
 
             <Text style={{ color: "red" }}>{BTstate == "PoweredOn" ? "" : "Turn Bluetooth ON."}</Text>
 
