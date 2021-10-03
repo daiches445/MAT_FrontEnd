@@ -52,6 +52,7 @@ export default function SignUpBiometric(props) {
         console.log("BIOMETRIC ACCESS FUNCTION ====");
 
         props.SignUp({ username, password })
+
         // .then(res => {
         //     console.log("LOG FROM BIOMETRIC ACCESS RES =====", res);
 

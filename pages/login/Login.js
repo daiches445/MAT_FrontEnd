@@ -1,22 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState ,useContext} from 'react';
 import { TextInput, Button, StyleSheet, Text, View, PermissionsAndroid, Platform, Alert, ToastAndroid, Pressable } from 'react-native';
 import { BleManager, Device, Service } from 'react-native-ble-plx';
 import { manager } from '../../App';
 import * as encoding from 'text-encoding';
 import { Buffer } from 'buffer';
 import base64 from 'react-native-base64';
-import BiometricPopup from './BiometricPopup'
 import SignUpBiometric from './SignUpBiometric'
 import * as Keychain from 'react-native-keychain';
 import FingerprintScanner from 'react-native-fingerprint-scanner';
 import Register from '../registration/Register';
-import { resolve } from 'path';
-import { rejects } from 'assert/strict';
+import { BLEcontext } from '../../App';
+import * as BLEFuncs from   '../BLE/BLEfunctios';
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
 
 export default function Login({ navigation }) {
+
+    const BLECtx = useContext(BLEcontext);
     const [username, setUsername] = useState("init_user")
     const [password, setPassword] = useState("init_pass")
     const [device, setDevice] = useState();
@@ -37,7 +38,6 @@ export default function Login({ navigation }) {
             setBtstate(state); console.log("INIT STATE ==== ", state);
         }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
-        Keychain.resetGenericPassword();
 
     }, [])
 
@@ -203,14 +203,6 @@ export default function Login({ navigation }) {
 
     }
 
-    async function SetCredentials() {
-        await Keychain.setGenericPassword(username, password, { accessControl: 'BiometryCurrentSetOrDevicePasscode' });
-        let cred = await Keychain.getGenericPassword().catch(err => { console.log("Credentials Error", err) });
-        console.log(cred);
-    }
-
-
-
     function Disconnect() {
         console.log('disconect');
 
@@ -237,7 +229,6 @@ export default function Login({ navigation }) {
         if (manager_status == "connected") {
             return (
                 <View>
-                    <Button title="Add fingerprint" onPress={SetCredentials} />
                     <Button title="disconnect" onPress={Disconnect} />
                     <SignUpBiometric
                         SignUp={RegisterBiometric}
@@ -252,25 +243,6 @@ export default function Login({ navigation }) {
             return (<Text>waiting for connect</Text>)
         }
 
-
-                // device.isConnected().then(res => {
-        //     console.log("is device connected ===", res);
-        //     if (res) {
-        //         return (
-        //             <View>
-        //                 <Button title="Add fingerprint" onPress={SetCredentials} />
-        //                 <Button title="disconnect" onPress={Disconnect} />
-        //                 <SignUpBiometric
-        //                     SignUp={SignUpBiometric}
-        //                     visibility={biometricVisibility}
-        //                     setVisibilty={setBiometricVisibilty} />
-        //             </View>
-        //         )
-        //     }
-        //     else {
-        //         return (<Text>waiting for connect</Text>)
-        //     }
-        // })
 
     }
 

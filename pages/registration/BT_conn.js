@@ -8,6 +8,7 @@ import { Buffer } from 'buffer';
 import { UserContext } from './Register';
 import MATCodeDialog from './MATCodeDialog';
 import base64 from 'react-native-base64';
+import * as funcs from '../BLE/BLEfunctios';
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
@@ -37,7 +38,7 @@ export default function BT_conn() {
                     console.log("Permission is OK");
                     // this.retrieveConnected()
                 } else {
-                    PermissionsAndroid.requestPermission(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
+                    PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
                         if (result) {
                             console.log("User accept");
                         } else {
@@ -152,8 +153,6 @@ export default function BT_conn() {
             return;
         }
 
-
-        let serv = services;
         await auth_service.characteristics().then(
             res => {
 

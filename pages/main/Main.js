@@ -4,8 +4,8 @@ import { StyleSheet, View, Text, ScrollView, TextInput, Button, SafeAreaView } f
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Home from './main/Home';
-import Stats from './main/Stats';
+import Home from './Home';
+import Stats from './Stats';
 
 const Tab = createBottomTabNavigator();
 
