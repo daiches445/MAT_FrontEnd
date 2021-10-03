@@ -27,6 +27,7 @@ export default function App() {
   reducer = (state, action) => {
     switch (action.type) {
       case "device":
+        console.log("device has changed in APP =====");
         return { ...state, device: action.value }
       case "services":
         return { ...state, services: action.value }
@@ -37,26 +38,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
 
 
-  async function ScanAndConnect() {
 
-    await manager.startDeviceScan(null, null, (error, device) => {
-
-      console.log("scanning");
-      if (error) {
-        console.log('ScanAndConnect error ============' + error.message);
-        manager.stopDeviceScan();
-        return;
-      }
-
-      if (device.name === "MAT") {
-        console.log("FOUND -- Device ID = " + device.id);
-        manager.stopDeviceScan();
-        return device;
-      }
-
-    });
-    manager.stopDeviceScan();
-  }
 
 
   return (
@@ -93,3 +75,24 @@ export default function App() {
   //   }
   //   get_devices();
   // }, [])
+
+  // async function ScanAndConnect() {
+
+  //   await manager.startDeviceScan(null, null, (error, device) => {
+
+  //     console.log("scanning");
+  //     if (error) {
+  //       console.log('ScanAndConnect error ============' + error.message);
+  //       manager.stopDeviceScan();
+  //       return;
+  //     }
+
+  //     if (device.name === "MAT") {
+  //       console.log("FOUND -- Device ID = " + device.id);
+  //       manager.stopDeviceScan();
+  //       return device;
+  //     }
+
+  //   });
+  //   manager.stopDeviceScan();
+  // }

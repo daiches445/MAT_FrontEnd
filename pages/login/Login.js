@@ -1,16 +1,13 @@
-import React, { useEffect, useState ,useContext} from 'react';
-import { TextInput, Button, StyleSheet, Text, View, PermissionsAndroid, Platform, Alert, ToastAndroid, Pressable } from 'react-native';
+import React, { useEffect, useState, useContext } from 'react';
+import { TextInput, Button, StyleSheet, Text, View, ToastAndroid, Pressable } from 'react-native';
 import { BleManager, Device, Service } from 'react-native-ble-plx';
 import { manager } from '../../App';
 import * as encoding from 'text-encoding';
 import { Buffer } from 'buffer';
 import base64 from 'react-native-base64';
 import SignUpBiometric from './SignUpBiometric'
-import * as Keychain from 'react-native-keychain';
-import FingerprintScanner from 'react-native-fingerprint-scanner';
-import Register from '../registration/Register';
 import { BLEcontext } from '../../App';
-import * as BLEFuncs from   '../BLE/BLEfunctios';
+import Icon from 'react-native-vector-icons/Fontisto';
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
@@ -24,7 +21,7 @@ export default function Login({ navigation }) {
     const [BTstate, setBtstate] = useState();
     const [services, setServices] = useState([new Service()]);
     const [biometricVisibility, setBiometricVisibilty] = useState(false);
-    const [biometric_signup,setBiometricSignup] = useState({res:null,value:""});
+    const [biometric_signup, setBiometricSignup] = useState({ res: null, value: "" });
     const [manager_status, setMangerStatus] = useState('idle');
 
 
@@ -37,7 +34,6 @@ export default function Login({ navigation }) {
         manager.state().then((state) => {
             setBtstate(state); console.log("INIT STATE ==== ", state);
         }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
-
 
     }, [])
 
@@ -67,6 +63,7 @@ export default function Login({ navigation }) {
 
             if (device.name === "MAT") {
                 setDevice(device);
+                BLEcontext.dispa
                 console.log("Device ID = " + device.id);
             }
             manager.stopDeviceScan();
@@ -86,8 +83,10 @@ export default function Login({ navigation }) {
                     d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
                     const serv = await manager.servicesForDevice(id)
                     setDevice(d);
-
                     setServices(serv);
+                    BLECtx.dispatch({type:'device',value:device})
+                    BLECtx.dispatch({type:'services',value:serv})
+
                     //console.log("serv 2 ==== ", serv[2]);
 
                 })().catch((err) => { console.log("CATCH DISCOVER SERVICES =========== " + err); });
@@ -120,7 +119,7 @@ export default function Login({ navigation }) {
                     console.log(element.uuid);
                 });
                 let user_data_char = res.find(c => c.uuid === char_uuid);
-
+                
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
                     .then(res => {
@@ -133,7 +132,8 @@ export default function Login({ navigation }) {
                             console.log("LOG FORM FINALLY AFTER READ", response);
                             if (response === "true") {
                                 console.log("LOGIN SUCCESS");
-                                return true;
+                                
+                                navigation.navigate('Main');
                             }
                             else {
                                 console.log(response, " INCORRECT");
@@ -232,7 +232,7 @@ export default function Login({ navigation }) {
                     <Button title="disconnect" onPress={Disconnect} />
                     <SignUpBiometric
                         SignUp={RegisterBiometric}
-                        signUpValue = {biometric_signup}
+                        signUpValue={biometric_signup}
                         visibility={biometricVisibility}
                         setVisibilty={setBiometricVisibilty} />
                 </View>
@@ -250,17 +250,20 @@ export default function Login({ navigation }) {
         <View>
             <Button title="Search For MAT" onPress={ScanAndConnect} />
             <View >
-                {device ?
-                    <Pressable
-                        onPress={() => { ConnectToDevice(device.id) }}>
-                        <Text style={{ fontSize: 30, margin: 10 }}>{device.name}</Text>
-                    </Pressable> : console.log("no mat dev avilable")}
+                {device ? <Icon.Button
+                
+                    name="motorcycle"
+                    onPress={()=>{ConnectToDevice(device.id)}}
+                    style={{margin:10,fontSize:30}}
+                >
+                    {device.name}
+                </Icon.Button>
+                    : console.log("no mat dev avilable")}
             </View>
             <TextInput maxLength={20} placeholder="username" onChangeText={setUsername} />
             <TextInput maxLength={20} secureTextEntry={true} placeholder="password" onChangeText={setPassword} />
 
             <Button disabled={BTstate == "PoweredOn" ? false : true} title="Login" onPress={SignInUserData} />
-            <Button title="move to reg" onPress={() => { navigation.navigate("Register") }} />
 
             {/* <Button title ="Add fingerprint" onPress={SetCredentials}/>
             <Button title="disconnect" onPress={Disconnect} />
@@ -269,6 +272,9 @@ export default function Login({ navigation }) {
                 visibility={biometricVisibility}
                 setVisibilty={setBiometricVisibilty} /> */}
             {IsDeviceConnected()}
+            <Button title="move to reg" onPress={() => { navigation.navigate("Register") }} />
+            <Button title="move to home" onPress={() => { navigation.navigate("Main") }} />
+
 
             <Text style={{ color: "red" }}>{BTstate == "PoweredOn" ? "" : "Turn Bluetooth ON."}</Text>
 
