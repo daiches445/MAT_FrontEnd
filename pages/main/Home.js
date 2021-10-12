@@ -1,25 +1,29 @@
 import React, { useEffect, useState, useContext } from 'react';
 
-import { Platform, PermissionsAndroid, StyleSheet, View, Text, ScrollView, TextInput, Button, SafeAreaView, ToastAndroid, Pressable, Alert } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, SafeAreaView, ToastAndroid, Pressable, Alert ,Dimensions} from 'react-native';
+import { Button } from 'react-native-paper';
 import { BleManager, Device } from 'react-native-ble-plx';
-import { encode as btoa } from 'react-native-base64'
 import * as encoding from 'text-encoding';
 import { Buffer } from 'buffer';
 import { manager } from '../../App';
 import { BLEcontext } from '../../App';
+import FontistoIcon from 'react-native-vector-icons/Fontisto';
 import Icon from 'react-native-vector-icons/FontAwesome5';
+import * as fonts from '../../styles/typography';
+import * as colors from '../../styles/colors';
+import { color } from 'react-native-reanimated';
 
-//const manager = new BleManager();
-const encoder = new encoding.TextEncoder();
+const windowWidth = Dimensions.get('window').width;
+const windowHeight = Dimensions.get('window').height;
 
 export default function Home({ navigation }) {
 
     const BLEctx = useContext(BLEcontext);
 
-    const [device, SetDevice] = useState([]);
+    //const [device, SetDevice] = useState([]);
     const [deviceUID, SetDeviceUID] = useState('Not avilable');
     const [BTstate, setBtstate] = useState();
-    const [isSwitchOn,setIsSwitchOn] = useState(false);
+    const [isSwitchOn, setIsSwitchOn] = useState(false);
     // const [services, setServices] = useState('');
 
     useEffect(() => {
@@ -50,42 +54,49 @@ export default function Home({ navigation }) {
 
     async function Switch() {
 
-        const services = BLEctx.state.services;
+
+        let services = BLEctx.state.services;
+        let device = BLEctx.state.device;
+
+        console.log("LOVCAL SERVICES", services);
         if (services === undefined) {
-            ToastAndroid.show("Services undefined",ToastAndroid.LONG)
+            ToastAndroid.show("Services undefined", ToastAndroid.LONG)
             return;
         }
-        let response;
         let ignition_service_uuid = "19b10000-e8f2-537e-4f6c-d104768a1214";
         let char_uuid = "19b10001-e8f2-537e-4f6c-d104768a1214";
         let ignition_service = services.find(s => s.uuid === ignition_service_uuid)
+        //let device = BLEctx.state.device;
 
         if (ignition_service === undefined) {
-            console.log("AUTH SERVICE UNDEFINED");
+            console.log("IGNITION SERVICE UNDEFINED");
             return;
         }
+        console.log("ignition service uuid ==== ", ignition_service.uuid);
 
         await ignition_service.characteristics().then(
             res => {
                 let switch_char = res.find(c => c.uuid === char_uuid);
-                let on_off = isSwitchOn?0:1;
-                device.writeCharacteristicWithResponseForService(ignition_service.uuid, switch_char.uuid,on_off)
+
+                let indicator = isSwitchOn ? new Int8Array([0]) : new Int8Array([1]);
+
+                console.log("indicator ====", indicator);
+                device.writeCharacteristicWithResponseForService(ignition_service.uuid, switch_char.uuid, Buffer.from(indicator).toString('base64'))
                     .then(res => {
+                        console.log(res);
                         setIsSwitchOn(!isSwitchOn);
 
                     }).catch(err => { console.log("CATCH WRITE DATE  ", err); });
-                //setCharacteristics(res)
 
             }).catch(err => { console.log("CATCH CHARS ERR ======== ", err) });
 
-        return false;
     }
 
-    async function ReDiscoverServices(){
+    async function ReDiscoverServices() {
         let device = BLEctx.state.device;
-        let services  = await manager.servicesForDevice(device.id);
-        services.forEach(s=>{
-            console.log("SERVICE UUID ===",s.uuid);
+        let services = await manager.servicesForDevice(device.id);
+        services.forEach(s => {
+            console.log("SERVICE UUID ===", s.uuid);
         })
     }
 
@@ -116,25 +127,20 @@ export default function Home({ navigation }) {
     else {
         return (
             BTstate === "PoweredOn" ?
-                <View>
+                <View style={styles.container} accessible={false}>
+                    <View style={styles.header}></View>
+                    <View style={styles.switch_btn_cont}>
+                        <FontistoIcon.Button
+                            name="motorcycle"
+                            size={80}
+                            color={isSwitchOn ? colors.TITLE_SHADOW : colors.light_grey}
+                            backgroundColor={isSwitchOn ? "#ee9b00" : colors.light_black}
+                            style={styles.switch_btn}
+                            onPress={Switch}></FontistoIcon.Button>
+                        <Button title="rediscover services" onPress={ReDiscoverServices}></Button>
+                    </View>
 
-                    {/* {device === undefined?<Text>device undfined</Text>:console.log(characteristics)} */}
-                    <Text>{BTstate}</Text>
-                    {/* <Text>Device name  = {BLEctx.state.device !== undefined ? device.name : "device undifined"}</Text> */}
-                    {/* <Text>Device ID  = {deviceUID}</Text> */}
-                    <Icon.Button
-                        onPress={Switch}
-                        name="fire"
-                        size={50}
-                        color="black"
-                        backgroundColor="rgba(255, 0, 0, 0)"
-                        style={{ flexDirection: "column", width: 100, alignSelf: "center" }}
-                    >
-                        TURN  ON
-                    </Icon.Button>
-                    <Button title="rediscover services" onPress={ReDiscoverServices}></Button>
-
-                    <Button title="Exit" onPress={Disconnect}></Button>
+                    <Button onPress={Disconnect}>Exit</Button>
 
                 </View>
                 :
@@ -148,6 +154,18 @@ export default function Home({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+    container:{
+        backgroundColor:"red",
+        flexDirection:"column",
+        alignItems:"center",
+        height:windowHeight
+    },
+    header:{
+        height:windowHeight*0.2,
+        borderBottomWidth:2,
+        borderBottomColor:colors.BLACK,
+        
+    },
     title: {
         fontSize: 50,
         color: "red"
@@ -155,56 +173,16 @@ const styles = StyleSheet.create({
     devices_view: {
         marginTop: 10
     }
+    ,switch_btn_cont:{
+        justifyContent:"center",
+        width:windowWidth *0.6
+    },switch_btn:{
+        flexDirection:"column",
+        width:windowWidth *0.6,
+        alignSelf:"center",
+        borderWidth:2,
+        borderColor:colors.BLACK,
+        alignItems:"center",
+
+    }
 })
-
-
-    // function getServicesAndCharacteristics(dev) {
-    //     return new Promise((resolve, reject) => {
-    //         dev.services().then(services => {
-    //             const characteristics = []
-    //             console.log("ashu_1", services)
-    //             services.forEach((service, i) => {
-    //                 service.characteristics().then(c => {
-    //                     console.log("service.characteristics")
-
-    //                     characteristics.push(c)
-    //                     console.log(characteristics)
-    //                     if (i === services.length - 1) {
-    //                         const temp = characteristics.reduce( 
-    //                             (acc, current) => {
-    //                                 return [...acc, ...current]
-    //                             },
-    //                             []
-    //                         )
-    //                         const dialog = temp.find(
-    //                             characteristic =>
-    //                                 characteristic.isWritableWithoutResponse
-    //                         )
-    //                         if (!dialog) {
-    //                             reject('No writable characteristic')
-    //                         }
-    //                         resolve(dialog)
-    //                     }
-
-    //                 })
-    //             })
-    //         })
-    //     })
-    // }
-    // async function scanAndConnect() {
-
-    //     await manager.startDeviceScan(null, null, (error, device) => {
-    //         let dev_lst = device_lst;
-    //         console.log("scanning");
-    //         if (error) {
-    //             console.log('ScanAndConnect error ============' + error.androidErrorCode);
-    //             manager.stopDeviceScan();
-    //             return;
-    //         }
-    //         console.log("Device ID = " + device.id);
-    //         SetDeviceLst(dev_lst);
-    //         SetDevice(device);
-    //         manager.stopDeviceScan();
-
-    //     });
-    // }

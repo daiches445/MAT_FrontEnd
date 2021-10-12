@@ -6,13 +6,16 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Home from './Home';
 import Stats from './Stats';
+import { TITLE_SHADOW } from '../../styles/colors';
 
 const Tab = createBottomTabNavigator();
 
 export default function Main() {
     return (
         <Tab.Navigator initialRouteName='Home'
-        screenOptions={{headerShown:false}}
+            
+            screenOptions={
+                {headerShown:false,tabBarStyle:{backgroundColor:"black"}}}
         >
             <Tab.Screen name="Home" component={Home}
             options={{
