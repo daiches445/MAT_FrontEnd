@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { TextInput, StyleSheet, Text, View, ToastAndroid, Pressable, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, ToastAndroid, Pressable, Dimensions } from 'react-native';
 import { BleManager, Device, Service } from 'react-native-ble-plx';
 import { Button } from 'react-native-paper';
 import { manager } from '../../App';
@@ -11,10 +11,13 @@ import { BLEcontext } from '../../App';
 import FontistoIcon from 'react-native-vector-icons/Fontisto';
 import EvilIcon from 'react-native-vector-icons/EvilIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+
 import * as fonts from '../../styles/typography';
 import * as colors from '../../styles/colors';
-import * as Animatable from 'react-native-animatable';
 
+import Header from './Header';
+import Form from './Form';
+import Footer from './Footer';
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
@@ -25,7 +28,7 @@ const windowHeight = Dimensions.get('window').height;
 export default function Login({ navigation }) {
 
 
-    const test_date = new Date();
+    const scan_start = new Date();
     const BLECtx = useContext(BLEcontext);
     const [username, setUsername] = useState("init_user")
     const [password, setPassword] = useState("init_pass")
@@ -42,52 +45,77 @@ export default function Login({ navigation }) {
         if (!manager) {
             manager = new BleManager();
         }
-        console.log("USE EFFECT LOGIN ,STATE ===",BLECtx.state);
-        manager.state().then((state) => {
-            setBtstate(state); console.log("INIT STATE ==== ", state);
-        }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
+        manager.state()
+            .then((state) => {
+                setBtstate(state);
 
-        await ScanAndConnect();
+                if (state === "PoweredOn") {
+                    ScanAndConnect();
+                }
+            }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
+
+        const IsDeviceConnected = async () => {
+            if (!device) {
+                {
+                    await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
+                        .then(res => {
+                            if (res[0]) {
+                                (async () => {
+                                    const services = await manager.servicesForDevice(res[0].id)
+                                    BLECtx.dispatch({ type: "device", value: res[0] })
+                                    BLECtx.dispatch({ type: "services", value: services })
+                                })
+                            }
+                        }).catch(err => { console.log("CATCH ERR FROM IsDeviceConnected ===", err); })
+                }
+            }
+        }
+        //IsDeviceConnected();
+
 
     }, [])
 
     useEffect(() => {
         const subscription = manager.onStateChange((state) => {
             setBtstate(state);
-            console.log("State Change ==== ", state);
+
+            manager.stopDeviceScan();
+            setMangerStatus("idle");
+
+            if (state === "PoweredOn") {
+                ScanAndConnect();
+            }
+
         });
         return () => subscription.remove();
     }, [manager]);
 
 
     async function ScanAndConnect() {
-        let scan_start = new Date();
         let scan_end;
         setMangerStatus('scanning');
 
         manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
             scan_end = new Date();
             console.log("scanning");
+            var timeDiff = scan_end - scan_start;
+            timeDiff /= 1000;
+            var seconds = Math.round(timeDiff);
+
+            if (seconds > 3) {
+                manager.stopDeviceScan();
+            }
 
             if (error) {
                 console.log('ScanAndConnect error ============' + error.message);
                 manager.stopDeviceScan();
                 setMangerStatus('idle');
-                return error;
             }
 
             if (device.name === "MAT") {
-                console.log("Device ID = " + device.id);
-                // setDevice(device)
+                setDevice(device)
                 manager.stopDeviceScan();
                 ConnectToDevice(device.id)
-                return device;
-            }
-
-            let diff = Math.round((scan_end - scan_start) / 1000)
-            if (diff > 3) {
-                setMangerStatus("idle");
-                manager.stopDeviceScan();
             }
 
         });
@@ -95,17 +123,18 @@ export default function Login({ navigation }) {
     }
 
     async function ConnectToDevice(id) {
+
         console.log('connecting..');
         await manager.connectToDevice(id, { autoConnect: true })
             .then((d) => {
                 (async () => {
                     setMangerStatus('connected');
                     console.log("discover services....");
-                    // d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
+                    d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
                     const serv = await manager.servicesForDevice(id)
                     setDevice(d);
                     setServices(serv);
-                    BLECtx.dispatch({ type: 'device', value: device })
+                    BLECtx.dispatch({ type: 'device', value: d })
                     BLECtx.dispatch({ type: 'services', value: serv })
 
                     //console.log("serv 2 ==== ", serv[2]);
@@ -126,7 +155,7 @@ export default function Login({ navigation }) {
         let auth_service = services.find(s => s.uuid === auth_service_uuid)
 
         if (auth_service === undefined) {
-            console.log("AUTH SERVICE UNDEFINED");
+            console.log("SignInUserData func === AUTH SERVICE UNDEFINED");
             return;
         }
 
@@ -139,24 +168,18 @@ export default function Login({ navigation }) {
                 }
                 console.log("DATA TO SEND =====", JSON.stringify(data));
                 let msg = encoder.encode(JSON.stringify(data));
-                res.forEach(element => {
-                    console.log(element.uuid);
-                });
                 let user_data_char = res.find(c => c.uuid === char_uuid);
 
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
                     .then(res => {
-                        console.log("Char IS Readable ==", user_data_char.isReadable);
 
                         user_data_char.read().then(res => {
                             response = base64.decode(res.value);
                             console.log("user_data_char.read()=====", response);
                         }).finally(() => {
-                            console.log("LOG FORM FINALLY AFTER READ", response);
                             if (response === "true") {
                                 console.log("LOGIN SUCCESS");
-
                                 navigation.navigate('Main');
                             }
                             else {
@@ -182,7 +205,7 @@ export default function Login({ navigation }) {
         let auth_service = services.find(s => s.uuid === auth_service_uuid)
 
         if (auth_service === undefined) {
-            console.log("AUTH SERVICE UNDEFINED");
+            console.log("RegisterBiometric func == AUTH SERVICE UNDEFINED");
             return;
         }
 
@@ -230,8 +253,7 @@ export default function Login({ navigation }) {
     function Disconnect() {
         console.log('disconect');
 
-
-        if (device === null) {
+        if (device === undefined) {
             console.log("device undifined");
             return;
         }
@@ -244,171 +266,103 @@ export default function Login({ navigation }) {
         }
     }
 
-    async function IsDeviceConnected() {
 
-
-        if (!device)
-{        await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
-        .then(res=>{
-            if(res[0]){
-                (async ()=>{
-                    const services = await manager.servicesForDevice(res[0].id)
-                    BLECtx.dispatch({type:"device",value:res[0]})
-                    BLECtx.dispatch({type:"services",value:services})
-                })
-            }else{
-                return (<Text></Text>)
-            }
-        }).catch(err=>{console.log("CATCH ERR FROM IsDeviceConnected ===",err);})}
-
-        if (manager_status == "connected") {
-            return (
-                <View>
-                    <Button title="disconnect" onPress={Disconnect} />
-                    <SignUpBiometric
-                        SignUp={RegisterBiometric}
-                        signUpValue={biometric_signup}
-                        visibility={biometricVisibility}
-                        setVisibilty={setBiometricVisibilty} />
-                </View>
-            )
-        } else if (manager_status == "scanning") {
-            return (<Text>scanning</Text>)
-        } else {
-            return (<Text>waiting for connect</Text>)
-        }
-
-
-    }
 
     return (
         <View style={styles.container}>
-            <View style={styles.title_view}>
-                <Text style={styles.title}>MAT</Text>
-                <Text style={styles.secondery_title}>MAT</Text>
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: "nowrap", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ fontFamily: fonts.TITLE_big_noodle_titling }}>manger status == {manager_status}</Text>
-                <EvilIcon.Button
-                    style={{ alignSelf: "flex-end" }}
-                    color="black"
-                    name="redo"
-                    size={20}
-                    backgroundColor="rgba(255, 0, 0, 0)"
-                    onPress={ScanAndConnect}
-                ></EvilIcon.Button>
-            </View>
-            <Button title="Search For MAT" onPress={ScanAndConnect} > scan </Button>
-            {/* <Animatable.View animation="fadeIn">
-                {device ? <FontistoIcon.Button
-
-                    name="motorcycle"
-                    onPress={() => { ConnectToDevice(device.id) }}
-                    style={{ margin: 10, fontSize: 30 }}
-                >
-                    {device.name}
-                </FontistoIcon.Button>
-                    : console.log("no mat dev avilable")}
-            </Animatable.View> */}
-            <View style={styles.inputs_cont}>
-                <TextInput style={{ borderBottomColor: colors.light_black, borderBottomWidth: 6 }} maxLength={20} placeholder="username" onChangeText={setUsername} />
-                <TextInput maxLength={20} secureTextEntry={true} placeholder="password" onChangeText={setPassword} />
-            </View>
-
+            <Header />
+            <Form username={username} setUsername={setUsername} setPassword={setPassword} />
             <View style={styles.btns_cont}>
                 <Button
                     color="white"
-                    mode="outlined"
+                    mode="text"
                     loading={manager_status == "scanning"}
-                    style={{
-                        flexGrow: 1,
-                    }}
-                    labelStyle={styles.login_btn}
-                    disabled={(BLECtx.state.device?false:true )||(BTstate == "PoweredOn" ? false : true)}
+                    style={styles.login_btn}
+                    labelStyle={styles.label_login_btn}
+                    disabled={manager_status !== "connected"}
                     onPress={SignInUserData} >
                     <Text>{manager_status == "scanning" ? "SCANNING" : "LOGIN"}</Text>
                 </Button>
-                <FontAwesome5.Button style={styles.biometric_btn}
-                    name="fingerprint"
-                    size={30}
-                    color="black"
-                    backgroundColor="transparent"
-                    onPress ={Bi}
-                    ></FontAwesome5.Button>
+                <SignUpBiometric
+                    connected={device !== undefined}
+                    SignUp={RegisterBiometric}
+                    signUpValue={biometric_signup}
+                    visibility={biometricVisibility}
+                    setVisibilty={setBiometricVisibilty} />
 
             </View>
-            {IsDeviceConnected()}
-            {/* <Button title="move to reg" onPress={() => { navigation.navigate("Register") }} />
-            <Button title="move to home" onPress={() => { navigation.navigate("Main") }} /> */}
 
+            <Button onPress={Disconnect}>disconnect</Button>
+            <Button onPress={() => { navigation.navigate("Register") }} >Join MAT</Button>
 
             <Text style={{ color: "red" }}>{BTstate == "PoweredOn" ? "" : "Turn Bluetooth ON."}</Text>
-
+            <Footer />
         </View>
     )
 }
 
 const styles = StyleSheet.create({
     container: {
-        width: windowWidth * 0.9,
+        width: windowWidth,
+        height: windowHeight,
         alignSelf: "center",
-        alignContent: "flex-end",
+        justifyContent: "space-between",
         fontFamily: fonts.TITLE_big_noodle_titling
 
     },
-    title: {
-        position: "relative",
-        fontFamily: fonts.TITLE_heroworship_grad,
-        color: colors.TITLE_SHADOW,
-        fontSize: 150,
-        right: 7,
-        top: 7
-
-    },
-    secondery_title: {
-        position: "absolute",
-        fontFamily: fonts.TITLE_heroworship,
-        color: colors.BLACK,
-        fontSize: 150,
-    },
-    title_view: {
-        position: 'relative',
-        fontFamily: fonts.TITLE_big_noodle_titling,
-        fontSize: 100,
-        justifyContent: 'center', alignItems: 'center'
-
-    },
-    inputs_cont: {
+    login_btn: {
         borderWidth: 2,
         borderColor: colors.light_black,
-        borderRadius: 4,
-        padding: 5,
+        width: windowWidth * 0.6,
+        justifyContent:"center"
     },
-    input: {
-        padding: 5,
-        backgroundColor: "red"
-    },
-    login_btn: {
+    label_login_btn: {
         fontFamily: fonts.TITLE_big_noodle_titling,
-        textAlign: "center",
-        textAlignVertical: "center",
-        fontSize: 40,
-    },
-    biometric_btn: {
-        width: 70,
-        flexGrow: 2,
-        justifyContent: "center"
+        fontSize: 30,
     },
     btns_cont: {
-        width: windowWidth * 0.87,
+        width: windowWidth * 0.8,
         alignSelf: "center",
         flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "stretch",
-        borderColor: colors.light_black,
-        borderWidth: 2,
-        borderBottomRightRadius: 10,
-        borderBottomLeftRadius: 3
-
+        justifyContent: "space-between"
     }
+
 })
+async function IsDeviceConnected() {
+
+    // if (!device) {
+    //     {
+    //         await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
+    //             .then(res => {
+    //                 if (res[0]) {
+    //                     (async () => {
+    //                         const services = await manager.servicesForDevice(res[0].id)
+    //                         BLECtx.dispatch({ type: "device", value: res[0] })
+    //                         BLECtx.dispatch({ type: "services", value: services })
+    //                     })
+    //                 } else {
+    //                     return (<Text></Text>)
+    //                 }
+    //             }).catch(err => { console.log("CATCH ERR FROM IsDeviceConnected ===", err); })
+    //     }
+    // }
+
+    if (manager_status == "connected") {
+        return (
+            <View>
+                <Button title="disconnect" onPress={Disconnect} />
+                <SignUpBiometric
+                    SignUp={RegisterBiometric}
+                    signUpValue={biometric_signup}
+                    visibility={biometricVisibility}
+                    setVisibilty={setBiometricVisibilty} />
+            </View>
+        )
+    } else if (manager_status == "scanning") {
+        return (<Text>scanning</Text>)
+    } else {
+        return (<Text>waiting for connect</Text>)
+    }
+
+
+}

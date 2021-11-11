@@ -7,3 +7,4 @@ export const TITLE_SHADOW = '#2a9d8f';
 export const light_grey = '#999999';
 export const light_black = '#4d4d4d';
 export const tab_backround = "#e9d8a6";
+export const transparent = "#00FFFFFF";

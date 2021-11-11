@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 
-import { StyleSheet, View, Text, ScrollView, TextInput, SafeAreaView, ToastAndroid, Pressable, Alert ,Dimensions} from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, SafeAreaView, ToastAndroid, Pressable, Alert, Dimensions } from 'react-native';
 import { Button } from 'react-native-paper';
 import { BleManager, Device } from 'react-native-ble-plx';
 import * as encoding from 'text-encoding';
@@ -12,19 +12,27 @@ import Icon from 'react-native-vector-icons/FontAwesome5';
 import * as fonts from '../../styles/typography';
 import * as colors from '../../styles/colors';
 import { color } from 'react-native-reanimated';
+import base64 from 'react-native-base64';
+
+
+const decoder = new encoding.TextDecoder();
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
+
+const monitor_transactionID = "monitor";
+
+const is_connected_service_uid = "911a0000-e8f2-537e-4f6c-d104768a1214";
+const is_connected_characteristic_uid = "911a0001-e8f2-537e-4f6c-d104768a1214";
 
 export default function Home({ navigation }) {
 
     const BLEctx = useContext(BLEcontext);
 
-    //const [device, SetDevice] = useState([]);
-    const [deviceUID, SetDeviceUID] = useState('Not avilable');
     const [BTstate, setBtstate] = useState();
     const [isSwitchOn, setIsSwitchOn] = useState(false);
     // const [services, setServices] = useState('');
+    const device_id = BLEctx.state.device.id;
 
     useEffect(() => {
 
@@ -35,17 +43,23 @@ export default function Home({ navigation }) {
             setBtstate(s); console.log(s);
         }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
+        console.log("Home UseEffect BleCtx state ==",BLEctx.state);
+        let sub;
+        MonitorConnection().then(res=>{
+            sub = res;
+        }).catch(err=>{console.log(err);});
 
-        //return(()=>{.()})
+        return (() => {
+            manager.cancelTransaction(monitor_transactionID);
+        })
     }, [])
 
     useEffect(() => {
         const subscription = manager.onStateChange((state) => {
             setBtstate(state);
             console.log(state);
-            if (state === 'PoweredOn') {
-                //scanAndConnect();
-                //subscription.remove();
+            if (state === 'PoweredOff') {
+                manager.cancelTransaction(monitor_transactionID);
             }
         }, true);
         return () => subscription.remove();
@@ -54,7 +68,7 @@ export default function Home({ navigation }) {
 
     async function Switch() {
 
-
+        
         let services = BLEctx.state.services;
         let device = BLEctx.state.device;
 
@@ -104,17 +118,54 @@ export default function Home({ navigation }) {
     function Disconnect() {
         console.log('disconect');
         try {
-            BLEctx.state.device.cancelConnection()
-                .then(closed_dev => {
-                    navigation.navigate('Login');
-                })
-                .catch((err) => {
-                    "disconnection err ocuured  =========" + JSON.stringify(err)
-                });
+            // manager.cancelTransaction(monitor_transactionID);
+            BLEctx.state.device.cancelConnection();
+
         } catch (error) {
             console.log("CATCH dissconect error =======" + JSON.stringify(error));
         }
     }
+
+
+    async function MonitorConnection() {
+        let serv = is_connected_service_uid;
+        let char = is_connected_characteristic_uid;
+
+        if(!device_id){
+            return;
+        }
+        console.log("device id from MonitorConnection func",device_id);
+
+        return manager.monitorCharacteristicForDevice(
+            device_id, serv, char,
+            (err, char) => {
+            if (err) {
+                console.log("Characteristic monitor error ==== ", err);
+                return;
+            }
+            let value_from_peripheral = char.value;
+            console.log("base64 decoded",base64.decode(value_from_peripheral));
+            console.log("no decode",base64.decode(value_from_peripheral));
+
+            char.writeWithResponse(value_from_peripheral);
+            char.descriptors
+        },monitor_transactionID)
+    }
+
+    async function StopIndications(){
+        let indecatios_desc;
+        let services = await manager.servicesForDevice(device_id);
+        let serv = services.filter(s => s.uuid === is_connected_service_uid);
+
+        await serv[0].descriptorsForCharacteristic(is_connected_characteristic_uid)
+        .then((res)=>{
+            console.log(Buffer.from(res[0].value));
+        }).catch(err=>{console.log("CATCH ERR StopIndications",err);})
+    }
+
+    //============//
+    //////MAIN//////
+    //============//
 
     if (BLEctx.state.device === undefined) {
         ToastAndroid.show("device undifined", ToastAndroid.LONG)
@@ -137,9 +188,9 @@ export default function Home({ navigation }) {
                             backgroundColor={isSwitchOn ? "#ee9b00" : colors.light_black}
                             style={styles.switch_btn}
                             onPress={Switch}></FontistoIcon.Button>
-                        <Button title="rediscover services" onPress={ReDiscoverServices}></Button>
                     </View>
-
+                    <Button onPress={ReDiscoverServices}>services</Button>
+                    <Button onPress={StopIndications}>Stop indications</Button>
                     <Button onPress={Disconnect}>Exit</Button>
 
                 </View>
@@ -154,17 +205,16 @@ export default function Home({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container:{
-        backgroundColor:"red",
-        flexDirection:"column",
-        alignItems:"center",
-        height:windowHeight
+    container: {
+        flexDirection: "column",
+        alignItems: "center",
+        height: windowHeight
     },
-    header:{
-        height:windowHeight*0.2,
-        borderBottomWidth:2,
-        borderBottomColor:colors.BLACK,
-        
+    header: {
+        height: windowHeight * 0.2,
+        borderBottomWidth: 2,
+        borderBottomColor: colors.BLACK,
+
     },
     title: {
         fontSize: 50,
@@ -173,16 +223,16 @@ const styles = StyleSheet.create({
     devices_view: {
         marginTop: 10
     }
-    ,switch_btn_cont:{
-        justifyContent:"center",
-        width:windowWidth *0.6
-    },switch_btn:{
-        flexDirection:"column",
-        width:windowWidth *0.6,
-        alignSelf:"center",
-        borderWidth:2,
-        borderColor:colors.BLACK,
-        alignItems:"center",
+    , switch_btn_cont: {
+        justifyContent: "center",
+        width: windowWidth * 0.6
+    }, switch_btn: {
+        flexDirection: "column",
+        width: windowWidth * 0.6,
+        alignSelf: "center",
+        borderWidth: 2,
+        borderColor: colors.BLACK,
+        alignItems: "center",
 
     }
 })

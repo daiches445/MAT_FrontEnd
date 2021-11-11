@@ -1,16 +1,17 @@
 import React, { useEffect, useReducer } from 'react';
-import { I18nManager } from 'react-native';
+import { I18nManager, ToastAndroid } from 'react-native';
 import { BleManager, Device } from 'react-native-ble-plx';
-import { DefaultTheme,Provider as PaperProvider, Provider } from 'react-native-paper';
+import { DefaultTheme, Provider as PaperProvider, Provider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { BACKROUND } from './styles/colors';
-
-//import type {Node} from 'react';
+import * as colors from './styles/colors';
+import * as fonts from './styles/typography';
+import LinearGradient from 'react-native-linear-gradient';
 
 import Login from './pages/login/Login';
 import Register from './pages/registration/Register';
 import Main from './pages/main/Main';
+import SignUpBiometric from './pages/login/SignUpBiometric';
 
 I18nManager.allowRTL(false);
 const Stack = createNativeStackNavigator();
@@ -18,14 +19,13 @@ export const manager = new BleManager();
 export const BLEcontext = React.createContext();
 
 const theme = {
-  ...DefaultTheme,
-  dark:true,
+  dark: false,
   colors: {
-    ...DefaultTheme.colors,
     primary: 'tomato',
     accent: 'yellow',
-    background :BACKROUND
+    background: colors.WHITE,
   },
+
 };
 
 export default function App() {
@@ -39,12 +39,11 @@ export default function App() {
   reducer = (state, action) => {
     switch (action.type) {
       case "device":
-        console.log("device has changed in APP =====");
         return { ...state, device: action.value }
       case "services":
         return { ...state, services: action.value }
       case "logout":
-        return {initialState}
+        return { initialState }
       default:
         return state;
     }
@@ -52,37 +51,51 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
 
   useEffect(() => {
-    
+    //manager = new BleManager();
     return () => {
-      Disconect();
+      //Disconect();
+      if (state.device) {
+        manager.cancelDeviceConnection(state.device.id)
+          .then(dev => {
+            ToastAndroid.show("device disconnected", ToastAndroid.LONG)
+            console.log("App Unmount ===", dev.localName);
+          }).catch(err => {
+            console.log("CATCH err App Unmount ===", err);
+
+          });
+
+      }
+      manager.destroy();
     }
   }, [])
 
 
-  const Disconect=()=>{
+  const Disconect = () => {
     manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
-    .then(res=>{
-      console.log("APP DISCONNECT RES===",res);
-      res.forEach(dev=>{
-        dev = dev.cancelConnection();
-        console.log("APP DISCONNECT CLOSED DEV===",dev.id);
+      .then(res => {
+        console.log("APP DISCONNECT RES===", res);
+        res.forEach(dev => {
+          dev = dev.cancelConnection();
+          console.log("APP DISCONNECT CLOSED DEV===", dev.id);
+        })
       })
-    })
   }
 
   return (
     <BLEcontext.Provider value={{ state: state, dispatch: dispatch }}>
-      <Provider >
-      <NavigationContainer
-        theme={theme}
-      >
-        <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen options ={{headerShown:false}} name="Login" component={Login} />
-          <Stack.Screen name="Register" component={Register} />
-          <Stack.Screen name="Main" component={Main} />
-        </Stack.Navigator>
-      </NavigationContainer>
-      </Provider>
+      {/* <Provider > */}
+
+        <NavigationContainer
+          theme={theme}
+        >
+          <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="Biometric" component={SignUpBiometric} />
+            <Stack.Screen name="Register" component={Register} />
+            <Stack.Screen name="Main" component={Main} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      {/* </Provider> */}
     </BLEcontext.Provider>
   )
 

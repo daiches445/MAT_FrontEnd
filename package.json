@@ -28,11 +28,12 @@
     "react-native-fingerprint-scanner": "^6.0.0",
     "react-native-gesture-handler": "^1.10.3",
     "react-native-keychain": "^7.0.0",
+    "react-native-linear-gradient": "^2.5.6",
     "react-native-paper": "^4.9.2",
     "react-native-reanimated": "^2.2.0",
     "react-native-safe-area-context": "^3.3.0",
     "react-native-screens": "^3.5.0",
-    "react-native-shaking-text": "^0.1.0",
+    "react-native-shake-text": "^0.1.1",
     "react-native-uuid": "^2.0.1",
     "react-native-vector-icons": "^8.1.0",
     "text-encoding": "^0.7.0"

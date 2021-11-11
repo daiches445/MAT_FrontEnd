@@ -3,7 +3,8 @@ import { StyleSheet, View, Text, ScrollView, TextInput, Button, SafeAreaView } f
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import UserDetails from './UserDetails';
-import BT_conn from './BT_conn';
+import DeviceSearch from './DeviceSearch';
+import Intro from './Intro';
 
 const Stack = createNativeStackNavigator();
 export const UserContext = React.createContext();
@@ -18,7 +19,6 @@ export default function Register() {
         mat_code: "28916d2",
         email: "email@email.com",
         re_email: "email@email.com",
-        uuid:""
     }
 
     reducer = (state, action) => {
@@ -35,8 +35,8 @@ export default function Register() {
                 return { ...state, email: action.value }
             case "re_email":
                 return { ...state, re_email: action.value }
-            case "uuid":
-                return { ...state, uuid: action.value }
+            // case "uuid":
+            //     return { ...state, uuid: action.value }
 
             default:
                 return state;
@@ -47,10 +47,10 @@ export default function Register() {
 
     return (
         <UserContext.Provider value={{ state: state, dispatch: dispatch }}>
-            <Stack.Navigator
-                screenOptions={{ headerShown: false }}>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="Intro" component={Intro}/>
                 <Stack.Screen name="UserDetails" component={UserDetails} />
-                <Stack.Screen name="BT_conn" component={BT_conn} />{/*try to 'modal'-style/pop up  */}
+                <Stack.Screen name="DeviceSearch" component={DeviceSearch} />{/*try to 'modal'-style/pop up  */}
             </Stack.Navigator>
         </UserContext.Provider>
 

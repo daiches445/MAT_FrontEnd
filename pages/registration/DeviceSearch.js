@@ -1,23 +1,31 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, StyleSheet, Text, View, PermissionsAndroid, Platform, Alert, ToastAndroid } from 'react-native';
-import RNBluetoothClassic from 'react-native-bluetooth-classic';
-import { BleManager, Device, Service } from 'react-native-ble-plx';
+import { StyleSheet, Text, View, PermissionsAndroid, Platform, Alert, ToastAndroid } from 'react-native';
+import { Button } from 'react-native-paper'
+
+import { BleManager, Service } from 'react-native-ble-plx';
 import { manager } from '../../App';
 import * as encoding from 'text-encoding';
 import { Buffer } from 'buffer';
-import { UserContext } from './Register';
-import MATCodeDialog from './MATCodeDialog';
 import base64 from 'react-native-base64';
-import * as funcs from '../BLE/BLEfunctios';
+import * as fonts from '../../styles/typography'
+
+import MATCodeDialog from './MATCodeDialog';
+import BluetoothOffDialog from './BluetoothOffDialog';
+
+import { UserContext } from './Register';
+import { BLEcontext } from '../../App';
+
 
 const encoder = new encoding.TextEncoder();
 const decoder = new encoding.TextDecoder();
 
-export default function BT_conn() {
+export default function DeviceSearch({navigation}) {
+
     const reg_service_uid = "A8B10021-E8F2-537E-4F6C-D104768A1214";
     const temp_uuid = "28916d26-a0c7-42c4-b45c-0069ed7c37fc";
 
     const userCtx = useContext(UserContext);
+    const BLEctx = useContext(BLEcontext);
 
     const [services, setServices] = useState([new Service()]);
     const [BTstate, setBtstate] = useState();
@@ -29,26 +37,15 @@ export default function BT_conn() {
         if (!manager)
             manager = new BleManager();
         manager.state().then((s) => {
-            setBtstate(s); console.log(s);
+            if(s === 'PoweredOn')
+                ScanAndConnect();
+            
+            setBtstate(s); 
+            console.log("BT state, DeviceSearch",s);
         }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
-        if (Platform.OS === 'android' && Platform.Version >= 23) {
-            PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
-                if (result) {
-                    console.log("Permission is OK");
-                    // this.retrieveConnected()
-                } else {
-                    PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
-                        if (result) {
-                            console.log("User accept");
-                        } else {
-                            console.log("User refuse");
-                        }
-                    });
-                }
-            });
-        }
-        //return(()=>{.()})
+
+
     }, [])
 
     useEffect(() => {
@@ -56,27 +53,12 @@ export default function BT_conn() {
             setBtstate(state);
             console.log(state);
             if (state === 'PoweredOn') {
-                //scanAndConnect();
-                //subscription.remove();
+                scanAndConnect();
             }
         }, true);
         return () => subscription.remove();
     }, [manager]);
 
-    // async function ConnectToDevice(id) {
-
-    //     console.log("connecting..");
-    //     await manager.connectToDevice(id, { autoConnect: true })
-    //     .then((device) => {
-    //         (async () => {
-    //             console.log("Connect to device ===== ", device.name);
-    //             // if(device.name == "MAT") add later to distinc MAT
-    //             let dev = await manager.discoverAllServicesAndCharacteristicsForDevice(id);
-    //             let serv = await manager.servicesForDevice(id);
-    //             console.log("DISCOVERD SERVIECS =======",serv);
-    //         })
-    //     }).catch((err) => { console.log("CATCH CONNECT===== ", JSON.stringify(err)); })
-    // }
 
     async function ScanAndConnect() {
 
@@ -90,10 +72,11 @@ export default function BT_conn() {
             }
 
             if (device.name === "MAT") {
+                ConnectToDevice(device.id)
                 setDevice(device);
-                console.log("Device ID = " + device.id);
+                console.log("ScanAndConnect func, Device ID = " + device.id);
+                manager.stopDeviceScan();
             }
-            manager.stopDeviceScan();
         });
 
     }
@@ -106,7 +89,7 @@ export default function BT_conn() {
                 (async () => {
                     console.log("discover services....");
 
-                    d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
+                    //d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
                     const serv = await manager.servicesForDevice(id)
                     setDevice(d);
                     setServices(serv);
@@ -132,14 +115,6 @@ export default function BT_conn() {
             console.log("CATCH dissconect error =======" + JSON.stringify(error));
         }
     }
-    // function ShowAvilableDevices(){
-    //     if(avilable_devices.length > 0) 
-    //         return avilable_devices.map((d, i) => { return (<Button key={i} title={d.name} onPress={() => { ConnectToDevice(d.id) }} />) })
-    //     else
-    //         return <Text>no devices</Text>}
-    // }s
-
-
 
 
     async function SendUserData() {
@@ -159,7 +134,7 @@ export default function BT_conn() {
                 let data = {
                     "username": userCtx.state.username,
                     "password": userCtx.state.password,
-                    "uuid":userCtx.state.uuid
+                    "uuid": userCtx.state.uuid
                 }
 
                 let msg = encoder.encode(JSON.stringify(data));
@@ -171,7 +146,7 @@ export default function BT_conn() {
                             user_data_char.read().then(res => {
                                 response = base64.decode(res.value);
                                 console.log(response);
-                            }).finally(()=>{})
+                            }).finally(() => { })
                         }
                         console.log("WRITE DATA ", res.value);
 
@@ -187,7 +162,6 @@ export default function BT_conn() {
         let char_uuid = "a0b10003-e8f2-537e-4f6c-d104768a1214";
         let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
         let serv = services;
-
         let auth_service = serv.find(s => s.uuid === auth_service_uuid)
 
         if (auth_service === undefined) {
@@ -208,10 +182,10 @@ export default function BT_conn() {
                         code_char.read().then(res => {
                             response = base64.decode(res.value);
                             console.log("FIRST RESPONSE ===== ", response);
-                        }).finally(()=>{
+                        }).finally(() => {
                             if (response === "true") {
                                 console.log("res == true");
-    
+
                                 setCodeDialogVisible(false);
                                 SendUserData();
                             }
@@ -219,55 +193,39 @@ export default function BT_conn() {
                                 console.log("res == false", response);
                                 userCtx.dispatch({ type: "mat_code", value: false })
                             }
-    
+
                         }).catch((err) => { console.log("CHAR READ ERROR ===", err); })
-
-
-
-                        // while (response === "null") {
-                        //     console.log("res == null");
-
-                        //     code_char.read().then(res => {
-                        //         response = base64.decode(res.value);
-                        //         console.log("RESPONSE ===== ",response);
-                        //     })
-                        // }
-
-
-
                     }).catch(err => { console.log("CATCH WRITE DATE  ", err); });
-
-
             }).catch(err => { console.log("CATCH CHARS ERR ======== ", err) });
     }
 
-
+    handleCancel=()=>{
+        navigation.navigate("Login")
+    }
 
     /// +++++++++ MAIN +++++++++///
     /// +++++++++ MAIN +++++++++///
 
     return (
-        BTstate == "PoweredOn" ?
-            <View style={styles.container}>
-                <Text>Device name  = {device ? device.name : " undefined"}</Text>
 
-                <Button title="show devices" onPress={ScanAndConnect} />
-                <Button title="disconnect" onPress={Disconnect} />
+        <View style={styles.container}>
+            <Text>Device name  = {device ? device.name : " undefined"}</Text>
 
-                <MATCodeDialog
-                    init_code={init_code}
-                    setInitCode={setInitCode}
-                    visible={code_dialog_visible}
-                    setVisible={setCodeDialogVisible}
-                    SendMATcode={SendMATcode} />
+            <Button onPress={ScanAndConnect} >show devices</Button>
+            <Button onPress={Disconnect} >disconnect</Button>
 
-                {device ? <Button title={device.name} onPress={() => { ConnectToDevice(device.id) }}></Button> : console.log("FROM MAIN --- no dev")}
+            <MATCodeDialog
+                init_code={init_code}
+                setInitCode={setInitCode}
+                visible={code_dialog_visible}
+                setVisible={setCodeDialogVisible}
+                SendMATcode={SendMATcode} />
 
-            </View> :
-            <View>
-                <Text>turn BT on</Text>
-                <Button title="turn bt on" onPress={() => { (manager.enable()).catch((err) => { console.log(err) }) }} />
-            </View>
+            {device ? <Button onPress={() => { ConnectToDevice(device.id) }}>{device.name}</Button> : console.log("FROM MAIN --- no dev")}
+            <BluetoothOffDialog BTstate={BTstate} handleCancel={handleCancel} />
+
+        </View>
+
     )
 
 }
@@ -279,60 +237,53 @@ const styles = StyleSheet.create({
         backgroundColor: "red",
         justifyContent: "space-around",
         margin: 4
+    },
+    no_bt_view: {
+        alignItems: "center"
+    },
+    no_bt_txt: {
+        fontFamily: fonts.TITLE_big_noodle_titling,
+        fontSize: 20,
+        margin: 40
+    },
+    no_bt_btn: {
+        fontWeight:"bold",
+        color:"black",
+        right:40
     }
 });
 
-async function requestAccessFineLocationPermission() {
-    const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-            title: 'Access fine location required for discovery',
-            message:
-                'In order to perform discovery, you must enable/allow ' +
-                'fine location access.',
-            buttonNeutral: 'Ask Me Later"',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK'
-        }
-    );
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-};
+// async function requestAccessFineLocationPermission() {
+//     const granted = await PermissionsAndroid.request(
+//         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+//         {
+//             title: 'Access fine location required for discovery',
+//             message:
+//                 'In order to perform discovery, you must enable/allow ' +
+//                 'fine location access.',
+//             buttonNeutral: 'Ask Me Later"',
+//             buttonNegative: 'Cancel',
+//             buttonPositive: 'OK'
+//         }
+//     );
+//     return granted === PermissionsAndroid.RESULTS.GRANTED;
+// };
 
 
 
-// if (isBluetoothOn)
-// return (
-
-//     <View style={styles.container}>
-//         <Text>Device name  = {avilable_devices.length > 0 ? avilable_devices[0].name : "device undifined"}</Text>
-//         <Button
-//             title="show devices"
-//             onPress={ScanAndConnect} />
-
-//         {console.log(JSON.stringify(avilable_devices))}
-//         {avilable_devices.map((d, i) => {
-//             return <Button key={i} title={d.name} onPress={() => { ConnectToDevice(d.id) }} />
-//         })}
-
-//         {console.log('render')}
-//     </View>
-
-// )
-// else {
-// return (
-//     <View>
-//         <Button
-//             title="turn on bt"
-//             onPress={() => {
-//                 try {
-//                     RNBluetoothClassic.requestBluetoothEnabled()
-//                 } catch (error) {
-
-//                 }
-//             }}
-//         />
-//         <Text>please turn bt on</Text>
-//         <Text>ddd</Text>
-//     </View>
-// )
-// }
+//if (Platform.OS === 'android' && Platform.Version >= 23) {
+    //     PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
+    //         if (result) {
+    //             console.log("Permission is OK");
+    //             // this.retrieveConnected()
+    //         } else {
+    //             PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
+    //                 if (result) {
+    //                     console.log("User accept");
+    //                 } else {
+    //                     console.log("User refuse");
+    //                 }
+    //             });
+    //         }
+    //     });
+    // }
