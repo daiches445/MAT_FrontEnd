@@ -53,6 +53,10 @@
 		6E162F4EB14E4AF885509B59 /* Octicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 872D176EFDF94CF2BB372B14 /* Octicons.ttf */; };
 		699B832ED04B4E268833C425 /* SimpleLineIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D902E9C2E31B431193E075F3 /* SimpleLineIcons.ttf */; };
 		16092A766682498D8E0722FD /* Zocial.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B97823D71EB94AE393475FDB /* Zocial.ttf */; };
+		88127A05378542DDA035505C /* coolvetica_cond.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7DFF9719EFEF485A9A471D0A /* coolvetica_cond.ttf */; };
+		01EC51D2875541D8A3AE1CC9 /* coolvetica_rg.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F0DA158F9B0848AA83698703 /* coolvetica_rg.ttf */; };
+		B1F09F58C9B34868B9AE28A5 /* Mohave-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F82254F3A6444B76A3738D02 /* Mohave-Regular.ttf */; };
+		49EB5009928242D686908E5E /* Mohave-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 07D51109C7AC4F00BA53611C /* Mohave-VariableFont_wght.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,6 +122,10 @@
 		872D176EFDF94CF2BB372B14 /* Octicons.ttf */ = {isa = PBXFileReference; name = "Octicons.ttf"; path = "../node_modules/react-native-vector-icons/Fonts/Octicons.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		D902E9C2E31B431193E075F3 /* SimpleLineIcons.ttf */ = {isa = PBXFileReference; name = "SimpleLineIcons.ttf"; path = "../node_modules/react-native-vector-icons/Fonts/SimpleLineIcons.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		B97823D71EB94AE393475FDB /* Zocial.ttf */ = {isa = PBXFileReference; name = "Zocial.ttf"; path = "../node_modules/react-native-vector-icons/Fonts/Zocial.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		7DFF9719EFEF485A9A471D0A /* coolvetica_cond.ttf */ = {isa = PBXFileReference; name = "coolvetica_cond.ttf"; path = "../assets/fonts/coolvetica_cond.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		F0DA158F9B0848AA83698703 /* coolvetica_rg.ttf */ = {isa = PBXFileReference; name = "coolvetica_rg.ttf"; path = "../assets/fonts/coolvetica_rg.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		F82254F3A6444B76A3738D02 /* Mohave-Regular.ttf */ = {isa = PBXFileReference; name = "Mohave-Regular.ttf"; path = "../assets/fonts/Mohave-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		07D51109C7AC4F00BA53611C /* Mohave-VariableFont_wght.ttf */ = {isa = PBXFileReference; name = "Mohave-VariableFont_wght.ttf"; path = "../assets/fonts/Mohave-VariableFont_wght.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -251,6 +259,10 @@
 				872D176EFDF94CF2BB372B14 /* Octicons.ttf */,
 				D902E9C2E31B431193E075F3 /* SimpleLineIcons.ttf */,
 				B97823D71EB94AE393475FDB /* Zocial.ttf */,
+				7DFF9719EFEF485A9A471D0A /* coolvetica_cond.ttf */,
+				F0DA158F9B0848AA83698703 /* coolvetica_rg.ttf */,
+				F82254F3A6444B76A3738D02 /* Mohave-Regular.ttf */,
+				07D51109C7AC4F00BA53611C /* Mohave-VariableFont_wght.ttf */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -387,6 +399,10 @@
 				6E162F4EB14E4AF885509B59 /* Octicons.ttf in Resources */,
 				699B832ED04B4E268833C425 /* SimpleLineIcons.ttf in Resources */,
 				16092A766682498D8E0722FD /* Zocial.ttf in Resources */,
+				88127A05378542DDA035505C /* coolvetica_cond.ttf in Resources */,
+				01EC51D2875541D8A3AE1CC9 /* coolvetica_rg.ttf in Resources */,
+				B1F09F58C9B34868B9AE28A5 /* Mohave-Regular.ttf in Resources */,
+				49EB5009928242D686908E5E /* Mohave-VariableFont_wght.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

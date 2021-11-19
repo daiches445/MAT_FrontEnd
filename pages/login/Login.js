@@ -12,6 +12,8 @@ import FontistoIcon from 'react-native-vector-icons/Fontisto';
 import EvilIcon from 'react-native-vector-icons/EvilIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
+import { AUTH_SERVICE } from '../ServicesAndCharacteristics';
+
 import * as fonts from '../../styles/typography';
 import * as colors from '../../styles/colors';
 
@@ -25,19 +27,25 @@ const decoder = new encoding.TextDecoder();
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
 
+const SCAN_TRANSACTION = "scan_transaction"
+
 export default function Login({ navigation }) {
 
 
     const scan_start = new Date();
     const BLECtx = useContext(BLEcontext);
+
     const [username, setUsername] = useState("init_user")
     const [password, setPassword] = useState("init_pass")
-    const [device, setDevice] = useState();
     const [BTstate, setBtstate] = useState();
-    const [services, setServices] = useState([new Service()]);
     const [biometricVisibility, setBiometricVisibilty] = useState(false);
-    const [biometric_signup, setBiometricSignup] = useState({ res: null, value: "" });
     const [manager_status, setMangerStatus] = useState('idle');
+    const [is_device_connected, setIs_device_connected] = useState(false);
+
+    //const [biometric_signup, setBiometricSignup] = useState({ res: null, value: "" });
+    //const [services, setServices] = useState([new Service()]);
+    //const [device, setDevice] = useState();
+
 
 
 
@@ -54,40 +62,23 @@ export default function Login({ navigation }) {
                 }
             }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
-        const IsDeviceConnected = async () => {
-            if (!device) {
-                {
-                    await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
-                        .then(res => {
-                            if (res[0]) {
-                                (async () => {
-                                    const services = await manager.servicesForDevice(res[0].id)
-                                    BLECtx.dispatch({ type: "device", value: res[0] })
-                                    BLECtx.dispatch({ type: "services", value: services })
-                                })
-                            }
-                        }).catch(err => { console.log("CATCH ERR FROM IsDeviceConnected ===", err); })
-                }
-            }
-        }
-        //IsDeviceConnected();
 
 
     }, [])
 
     useEffect(() => {
-        const subscription = manager.onStateChange((state) => {
+        const state_subscription = manager.onStateChange((state) => {
             setBtstate(state);
-
             manager.stopDeviceScan();
             setMangerStatus("idle");
 
-            if (state === "PoweredOn") {
+            if (state === "PoweredOn")
                 ScanAndConnect();
-            }
 
         });
-        return () => subscription.remove();
+
+
+        return () => state_subscription.remove();
     }, [manager]);
 
 
@@ -95,7 +86,7 @@ export default function Login({ navigation }) {
         let scan_end;
         setMangerStatus('scanning');
 
-        manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
+        manager.startDeviceScan([AUTH_SERVICE], { allowDuplicates: false }, (error, device) => {
             scan_end = new Date();
             console.log("scanning");
             var timeDiff = scan_end - scan_start;
@@ -113,7 +104,7 @@ export default function Login({ navigation }) {
             }
 
             if (device.name === "MAT") {
-                setDevice(device)
+                //setDevice(device)
                 manager.stopDeviceScan();
                 ConnectToDevice(device.id)
             }
@@ -132,10 +123,20 @@ export default function Login({ navigation }) {
                     console.log("discover services....");
                     d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
                     const serv = await manager.servicesForDevice(id)
-                    setDevice(d);
-                    setServices(serv);
+                    
+                    //setDevice(d);
+                    //setServices(serv);
+
                     BLECtx.dispatch({ type: 'device', value: d })
                     BLECtx.dispatch({ type: 'services', value: serv })
+                    setIs_device_connected(true);
+
+                    const disconnect_subscription = manager.onDeviceDisconnected(d.id, (err, device) => {
+                        console.log("disconnect event ");
+                        setMangerStatus('idle')
+                        setIs_device_connected(false);
+                        disconnect_subscription.remove();
+                    })
 
                     //console.log("serv 2 ==== ", serv[2]);
 
@@ -151,8 +152,9 @@ export default function Login({ navigation }) {
 
         let response;
         let char_uuid = "a0b10004-e8f2-537e-4f6c-d104768a1214";
-        let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
-        let auth_service = services.find(s => s.uuid === auth_service_uuid)
+        let auth_service_uuid = AUTH_SERVICE;
+        let auth_service = BLECtx.state.services.find(s => s.uuid === auth_service_uuid)
+        let device = BLECtx.state.device;
 
         if (auth_service === undefined) {
             console.log("SignInUserData func === AUTH SERVICE UNDEFINED");
@@ -196,73 +198,21 @@ export default function Login({ navigation }) {
         return false;
     }
 
-    async function RegisterBiometric(data) {
-
-        let response;
-        let return_value;
-        let char_uuid = "a0b10005-e8f2-537e-4f6c-d104768a1214";
-        let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
-        let auth_service = services.find(s => s.uuid === auth_service_uuid)
-
-        if (auth_service === undefined) {
-            console.log("RegisterBiometric func == AUTH SERVICE UNDEFINED");
-            return;
-        }
-
-        await auth_service.characteristics().then(
-            res => {
-
-                let msg = encoder.encode(JSON.stringify(data));
-                let user_data_char = res.find(c => c.uuid === char_uuid);
-
-                device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
-                    .then(res => {
-
-                        user_data_char.read().then(res => {
-                            response = base64.decode(res.value);
-                            console.log("user_data_char.read()=====", response);
-                        }).finally(() => {
-
-                            console.log("LOG FORM FINALLY AFTER READ", response);
-
-                            if (response === "true") {
-                                console.log("LOGIN SUCCESS");
-                                setBiometricSignup({ res: true, value: "" })
-                            }
-                            else {
-                                console.log(response, " INCORRECT");
-                                setBiometricSignup({ res: false, value: response });
-                            }
-
-                        })
-
-                    }).catch(err => {
-                        setBiometricSignup({ res: false, value: "CATCH WRITE DATE" });
-                        console.log("CATCH WRITE DATE  ", err);
-                    });
-                //setCharacteristics(res)
-
-            }).catch(err => {
-                setBiometricSignup({ res: false, value: "CATCH CHARS ERR" });
-                console.log("CATCH CHARS ERR ======== ", err)
-            });
-
-
-    }
-
     function Disconnect() {
-        console.log('disconect');
 
-        if (device === undefined) {
-            console.log("device undifined");
-            return;
-        }
-        try {
-            device.cancelConnection().catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
-            setMangerStatus('idle');
+        let dev = BLECtx.state.device;
+        if (dev !== undefined) {
 
-        } catch (error) {
-            console.log("CATCH dissconect error =======" + JSON.stringify(error));
+            try {
+                dev.cancelConnection().then(dev=>{
+                    setIs_device_connected(false);
+                    setMangerStatus('idle');
+    
+                }).catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
+
+            } catch (error) {
+                console.log("CATCH dissconect error =======" + JSON.stringify(error));
+            }
         }
     }
 
@@ -271,31 +221,42 @@ export default function Login({ navigation }) {
     return (
         <View style={styles.container}>
             <Header />
-            <Form username={username} setUsername={setUsername} setPassword={setPassword} />
+            <Form setUsername={setUsername} setPassword={setPassword} />
             <View style={styles.btns_cont}>
                 <Button
-                    color="white"
+                    color="black"
                     mode="text"
                     loading={manager_status == "scanning"}
                     style={styles.login_btn}
                     labelStyle={styles.label_login_btn}
-                    disabled={manager_status !== "connected"}
-                    onPress={SignInUserData} >
-                    <Text>{manager_status == "scanning" ? "SCANNING" : "LOGIN"}</Text>
+                    disabled={manager_status == "scanning" || BTstate == "PoweredOff"}
+                    onPress={is_device_connected ? SignInUserData : ScanAndConnect} >
+                    <Text style>{manager_status == "scanning" ? "SCANNING" : is_device_connected ? "LOGIN" : "SCAN"}</Text>
                 </Button>
                 <SignUpBiometric
-                    connected={device !== undefined}
-                    SignUp={RegisterBiometric}
-                    signUpValue={biometric_signup}
+                    connected={is_device_connected}
+                    //SignUp={RegisterBiometric}
+                    //signUpValue={biometric_signup}
+                    username= {{username,setUsername}}
+                    password = {{password,setPassword}}
+                    navigate2main={() => { navigation.navigate("Main") }}
                     visibility={biometricVisibility}
                     setVisibilty={setBiometricVisibilty} />
 
+                <Button
+                    mode={BTstate == "PoweredOn" ? "text" : "outlined"}
+                    disabled={BTstate == "PoweredOn"}
+                    labelStyle={styles.no_bt_err_txt}
+                    style={styles.no_bt_err_btn}
+                    onPress={() => { manager.enable() }}
+                >
+                    {BTstate == "PoweredOn" ? "" : "Turn Bluetooth ON."}</Button>
             </View>
+
 
             <Button onPress={Disconnect}>disconnect</Button>
             <Button onPress={() => { navigation.navigate("Register") }} >Join MAT</Button>
 
-            <Text style={{ color: "red" }}>{BTstate == "PoweredOn" ? "" : "Turn Bluetooth ON."}</Text>
             <Footer />
         </View>
     )
@@ -314,7 +275,7 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: colors.light_black,
         width: windowWidth * 0.6,
-        justifyContent:"center"
+        justifyContent: "center"
     },
     label_login_btn: {
         fontFamily: fonts.TITLE_big_noodle_titling,
@@ -324,45 +285,88 @@ const styles = StyleSheet.create({
         width: windowWidth * 0.8,
         alignSelf: "center",
         flexDirection: "row",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
+        flexWrap: "wrap"
+    },
+    no_bt_err_txt: {
+        fontFamily: fonts.TITLE_big_noodle_titling,
+        color: "red",
+    },
+    no_bt_err_btn: {
+        color: "red",
+        marginTop: 3
     }
 
 })
-async function IsDeviceConnected() {
 
-    // if (!device) {
-    //     {
-    //         await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
-    //             .then(res => {
-    //                 if (res[0]) {
-    //                     (async () => {
-    //                         const services = await manager.servicesForDevice(res[0].id)
-    //                         BLECtx.dispatch({ type: "device", value: res[0] })
-    //                         BLECtx.dispatch({ type: "services", value: services })
-    //                     })
-    //                 } else {
-    //                     return (<Text></Text>)
-    //                 }
-    //             }).catch(err => { console.log("CATCH ERR FROM IsDeviceConnected ===", err); })
-    //     }
-    // }
+// async function RegisterBiometric(data) {
 
-    if (manager_status == "connected") {
-        return (
-            <View>
-                <Button title="disconnect" onPress={Disconnect} />
-                <SignUpBiometric
-                    SignUp={RegisterBiometric}
-                    signUpValue={biometric_signup}
-                    visibility={biometricVisibility}
-                    setVisibilty={setBiometricVisibilty} />
-            </View>
-        )
-    } else if (manager_status == "scanning") {
-        return (<Text>scanning</Text>)
-    } else {
-        return (<Text>waiting for connect</Text>)
-    }
+//     let response;
+//     let char_uuid = "a0b10005-e8f2-537e-4f6c-d104768a1214";
+//     let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
+//     let auth_service = services.find(s => s.uuid === auth_service_uuid)
+
+//     if (auth_service === undefined) {
+//         console.log("RegisterBiometric func == AUTH SERVICE UNDEFINED");
+//         return;
+//     }
+
+//     await auth_service.characteristics().then(
+//         res => {
+
+//             let msg = encoder.encode(JSON.stringify(data));
+//             let user_data_char = res.find(c => c.uuid === char_uuid);
+
+//             device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
+//                 .then(res => {
+
+//                     user_data_char.read().then(res => {
+//                         response = base64.decode(res.value);
+//                         console.log("user_data_char.read()=====", response);
+//                     }).finally(() => {
+
+//                         console.log("LOG FORM FINALLY AFTER READ", response);
+
+//                         if (response === "true") {
+//                             console.log("LOGIN SUCCESS");
+//                             setBiometricSignup({ res: true, value: "" })
+//                         }
+//                         else {
+//                             console.log(response, " INCORRECT");
+//                             setBiometricSignup({ res: false, value: response });
+//                         }
+
+//                     })
+
+//                 }).catch(err => {
+//                     setBiometricSignup({ res: false, value: "CATCH WRITE DATE" });
+//                     console.log("CATCH WRITE DATE  ", err);
+//                 });
+//             //setCharacteristics(res)
+
+//         }).catch(err => {
+//             setBiometricSignup({ res: false, value: err });
+//             console.log("CATCH CHARS ERR ======== ", err)
+//         });
 
 
-}
+// }
+
+
+// const IsDeviceConnected = async () => {
+//     if (!device) {
+//         {
+//             await manager.connectedDevices(["a0b10000-e8f2-537e-4f6c-d104768a1214"])
+//                 .then(res => {
+//                     if (res[0]) {
+//                         (async () => {
+//                             const services = await manager.servicesForDevice(res[0].id)
+//                             BLECtx.dispatch({ type: "device", value: res[0] })
+//                             BLECtx.dispatch({ type: "services", value: services })
+//                         })
+//                     }
+//                 }).catch(err => { console.log("CATCH ERR FROM IsDeviceConnected ===", err); })
+//         }
+//     }
+// }
+//IsDeviceConnected();

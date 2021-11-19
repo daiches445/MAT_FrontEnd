@@ -4,4 +4,8 @@ export const TITLE_heroworship_gradial = 'heroworshipgradital';
 export const TITLE_big_noodle_titling= 'big_noodle_titling';
 export const TEXT_Mohave= 'Mohave-Regular';
 export const TEXT_Mohave_variable= 'Mohave-VariableFont_wght';
+export const TEXT_coolvetica_rg= 'coolvetica_rg';
+export const TEXT_coolvetica_cond= 'coolvetica_cond';
+
+
 

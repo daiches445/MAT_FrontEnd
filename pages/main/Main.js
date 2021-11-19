@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput, Button, SafeAreaView } from 'react-native';
 
-import { BleManager, Device } from 'react-native-ble-plx';
-import { manager } from '../../App';
-import { BLEcontext } from '../../App';
 
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
 import Home from './Home';
 import Stats from './Stats';
+
 import * as colors from '../../styles/colors';
 
-const Tab = createBottomTabNavigator();
+const Tab = createMaterialTopTabNavigator();
 
 export default function Main() {
     return (
-        <Tab.Navigator initialRouteName='Home'
+        <Tab.Navigator
+
+            initialRouteName='Home'
             screenOptions={
                 { headerShown: false, tabBarStyle: { backgroundColor: colors.PRIMARY } }}>
             <Tab.Screen name="Home" component={Home}

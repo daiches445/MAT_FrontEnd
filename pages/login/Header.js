@@ -14,16 +14,18 @@ export default function Header() {
     useEffect(() => {
         Animated.parallel([
             Animated.spring(title_x,{
+                delay:500,
                 mass:3,
-                toValue:10,
+                toValue:0,
                 useNativeDriver:true
             }),
             Animated.spring(title_y,{
-                mass:3,
+                delay:500,
+                friction:3,
                 toValue:17,
                 useNativeDriver:true
             })
-        ]).start();
+        ],).start();
     }, [])
 
     return (
@@ -33,7 +35,7 @@ export default function Header() {
                     position: "relative",
                     fontFamily: fonts.TITLE_heroworship_grad,
                     color: colors.TITLE_SHADOW,
-                    fontSize: 100,
+                    fontSize: 120,
                     transform:[{translateX:title_x},{translateY:title_y}]
                 }}>MAT</Animated.Text>
                 <Text style={styles.secondery_title}>MAT</Text>
@@ -63,7 +65,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         fontFamily: fonts.TITLE_heroworship,
         color: colors.BLACK,
-        fontSize: 100,
+        fontSize: 120,
 
     },
     welcome_txt: {

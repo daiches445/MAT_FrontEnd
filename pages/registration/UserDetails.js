@@ -15,33 +15,8 @@ const windowHeight = Dimensions.get('window').height;
 export default function UserDetails({ navigation }) {
 
     const userCtx = useContext(UserContext);
-    const [error_txt, setErrorTxt] = useState("");
+    const [error_txt, setErrTxt] = useState("");
     const shake_text_ref  = useRef(new Animated.Value(0)).current;
-    async function SetID({ username, password }) {
-
-        let token = username + password;
-        let id = uuid.v4();
-        console.log("ID ===", id);
-        console.log("TOKEN ===", token);
-        //SAVE ID
-
-        try {
-            await EncryptedStorage.setItem(token, id);
-            return id;
-        } catch (error) {
-            console.log("CATCH ERROR FORM REGISTER ===", error);
-        }
-
-
-        //GET SAVED ID
-        // try {
-        //     let stam = await EncryptedStorage.getItem("id")
-        //     console.log("VALUE ===== ", stam);
-        // } catch (error) {
-        //     console.log("CATCH ERROR FORM REGISTER ===", error);
-        // }
-
-    }
 
     const VerifyForm = () => {
         
@@ -49,7 +24,6 @@ export default function UserDetails({ navigation }) {
         let fields = userCtx.state;
         let regex = /^\w+$/;
         let email_regex = /^\S+@\S+\.\S+$/
-
 
         for (const key in fields) {
 
@@ -78,8 +52,6 @@ export default function UserDetails({ navigation }) {
                     err = key + " is shorter then 5 digits."
                     break;
                 }
-
-
             }
         }
 
@@ -91,7 +63,7 @@ export default function UserDetails({ navigation }) {
             err = "Email address dont match."
         }
         console.log(shake_text_ref);
-        setErrorTxt(err);
+        setErrTxt(err);
 
         shake_text_ref.setValue(0);
         Animated.spring(shake_text_ref,{
@@ -102,7 +74,6 @@ export default function UserDetails({ navigation }) {
 
         if (err == "") {
             let val = { username: fields.username, password: fields.password }
-            SetID(val);
             navigation.navigate("DeviceSearch");
         }
     }

@@ -31,7 +31,7 @@ export default function MATCodeDialog(props) {
             return;
         }
         //userCtx.dispatch({ type: "mat_code", value: props.init_code })
-        props.SendMATcode()
+        SendMATcode()
     }
 
     async function SendMATcode() {
@@ -77,21 +77,37 @@ export default function MATCodeDialog(props) {
             }).catch(err => { console.log("CATCH CHARS ERR ======== ", err) });
     }
 
+    function Disconnect() {
+        console.log('disconect');
+        if (BLEctx.state.device === null) {
+            console.log("device undifined");
+            return;
+        }
+        props.setIs_device_connected(false);
+
+        try {
+            BLEctx.state.device.cancelConnection().catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
+
+        } catch (error) {
+            console.log("CATCH dissconect error =======" + JSON.stringify(error));
+        }
+    }
+
 
     return (
         <View >
             <Button title="Show dialog" onPress={() => { props.setVisible(!props.visible) }} />
-            <Dialog.Container visible={props.visible}>
+            <Dialog.Container visible={props.is_device_connected}>
                 <Dialog.Title>Enter MAT code</Dialog.Title>
                 <Dialog.Description>
-                    Enter the 8 digit code printed inside the MAT controller package.{props.init_code}
+                    Enter the 8 digit code printed inside the MAT controller package.
                 </Dialog.Description>
                 <Dialog.Input maxLength={8} onChangeText={props.setInitCode} />
                 <Dialog.Description style={{ color: "red" }}>
                     <ShakeText>{userCtx.state.mat_code ? "" : "Invalid code Please try again"}</ShakeText>
                 </Dialog.Description>
                 <Dialog.Button label="Send" onPress={handleCodeSend} />
-                <Dialog.Button label="Cancel" onPress={() => { props.setVisible(false) }} />
+                <Dialog.Button label="Cancel" onPress={Disconnect} />
             </Dialog.Container>
         </View>
     )
