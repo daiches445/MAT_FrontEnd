@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer } from 'react';
-import { I18nManager, ToastAndroid } from 'react-native';
+import { I18nManager, ToastAndroid, Dimensions } from 'react-native';
 import { BleManager, Device } from 'react-native-ble-plx';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { DefaultTheme, Provider as PaperProvider, Provider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,11 +13,13 @@ import Login from './pages/login/Login';
 import Register from './pages/registration/Register';
 import Main from './pages/main/Main';
 import SignUpBiometric from './pages/login/SignUpBiometric';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 I18nManager.allowRTL(false);
 const Stack = createNativeStackNavigator();
 export const manager = new BleManager();
 export const BLEcontext = React.createContext();
+const windowHeight = Dimensions.get('screen').height;
 
 const theme = {
   dark: false,
@@ -25,6 +28,7 @@ const theme = {
     accent: 'yellow',
     background: colors.WHITE,
   },
+
 
 };
 
@@ -82,21 +86,32 @@ export default function App() {
   }
 
   return (
-    <BLEcontext.Provider value={{ state: state, dispatch: dispatch }}>
-      {/* <Provider > */}
+    <SafeAreaProvider>
+      <BLEcontext.Provider value={{ state: state, dispatch: dispatch }}>
+        <LinearGradient colors={[colors.TITLE_SHADOW, colors.TITLE_SHADOW_DARK]} style={{ flex: 1, paddingLeft: 10, paddingRight: 10 }}>
+          <NavigationContainer
+            theme={theme}
+            
+          >
+            <Stack.Navigator initialRouteName="Login"
+              screenOptions={
+                {
+                  animation: 'slide_from_left',
+                  headerShown: false,
+                  contentStyle: {margin:1,borderRadius:5 }
+                }}>
+              <Stack.Screen name="Login" component={Login} />
+              <Stack.Screen name="Biometric" component={SignUpBiometric} />
+              <Stack.Screen name="Register" component={Register} />
+              <Stack.Screen name="Main" component={Main} />
+            </Stack.Navigator>
+            
+          </NavigationContainer>
 
-        <NavigationContainer
-          theme={theme}
-        >
-          <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Login" component={Login} />
-            <Stack.Screen name="Biometric" component={SignUpBiometric} />
-            <Stack.Screen name="Register" component={Register} />
-            <Stack.Screen name="Main" component={Main} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      {/* </Provider> */}
-    </BLEcontext.Provider>
+        </LinearGradient>
+
+      </BLEcontext.Provider>
+    </SafeAreaProvider>
   )
 
 };

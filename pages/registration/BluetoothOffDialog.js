@@ -3,8 +3,12 @@ import { View, Text,StyleSheet } from 'react-native'
 import Dialog from "react-native-dialog";
 import { manager } from '../../App';
 import { TITLE_big_noodle_titling } from '../../styles/typography';
+import { useNavigation } from '@react-navigation/native';
 
 export default function BluetoothOffDialog(props) {
+
+    const navigation = useNavigation();
+
     return (
         <View>
             <Dialog.Container visible={props.BTstate == "PoweredOn" ? false : true}>
@@ -14,7 +18,7 @@ export default function BluetoothOffDialog(props) {
                     (manager.enable()).
                     catch((err) => { console.log(err) })
                 }}>Turn on</Dialog.Button>
-                <Dialog.Button label="cancel" onPress={()=>{props.handleCancel}}/>
+                <Dialog.Button label="cancel" onPress={()=>{navigation.goBack()}} />
             </Dialog.Container>
         </View>
     )

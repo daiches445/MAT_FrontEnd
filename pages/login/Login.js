@@ -12,7 +12,7 @@ import FontistoIcon from 'react-native-vector-icons/Fontisto';
 import EvilIcon from 'react-native-vector-icons/EvilIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
-import { AUTH_SERVICE } from '../ServicesAndCharacteristics';
+import { AUTH_SERVICE, USEDATA_LOGIN_CHAR } from '../ServicesAndCharacteristics';
 
 import * as fonts from '../../styles/typography';
 import * as colors from '../../styles/colors';
@@ -31,8 +31,6 @@ const SCAN_TRANSACTION = "scan_transaction"
 
 export default function Login({ navigation }) {
 
-
-    const scan_start = new Date();
     const BLECtx = useContext(BLEcontext);
 
     const [username, setUsername] = useState("init_user")
@@ -41,6 +39,7 @@ export default function Login({ navigation }) {
     const [biometricVisibility, setBiometricVisibilty] = useState(false);
     const [manager_status, setMangerStatus] = useState('idle');
     const [is_device_connected, setIs_device_connected] = useState(false);
+    const [err_text,setErrText] = useState('');
 
     //const [biometric_signup, setBiometricSignup] = useState({ res: null, value: "" });
     //const [services, setServices] = useState([new Service()]);
@@ -48,21 +47,20 @@ export default function Login({ navigation }) {
 
 
 
-
     useEffect(async () => {
         if (!manager) {
             manager = new BleManager();
         }
+        //await ConnectedDevices();
         manager.state()
             .then((state) => {
                 setBtstate(state);
 
-                if (state === "PoweredOn") {
-                    ScanAndConnect();
-                }
             }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
-
+        return () => {
+            manager.stopDeviceScan()
+        }
 
     }, [])
 
@@ -72,30 +70,23 @@ export default function Login({ navigation }) {
             manager.stopDeviceScan();
             setMangerStatus("idle");
 
-            if (state === "PoweredOn")
-                ScanAndConnect();
-
         });
 
-
-        return () => state_subscription.remove();
+        return () => {
+            console.log("Login unmount ");
+            setMangerStatus('idle')
+            state_subscription.remove();
+        }
     }, [manager]);
 
 
     async function ScanAndConnect() {
-        let scan_end;
-        setMangerStatus('scanning');
 
+        setMangerStatus('scanning');//keep track of manager status
+
+        //call the BLE manager to start device scan ,AUTH_SERVICE parameter = uuid of a service on MAT device.
         manager.startDeviceScan([AUTH_SERVICE], { allowDuplicates: false }, (error, device) => {
-            scan_end = new Date();
-            console.log("scanning");
-            var timeDiff = scan_end - scan_start;
-            timeDiff /= 1000;
-            var seconds = Math.round(timeDiff);
 
-            if (seconds > 3) {
-                manager.stopDeviceScan();
-            }
 
             if (error) {
                 console.log('ScanAndConnect error ============' + error.message);
@@ -103,10 +94,10 @@ export default function Login({ navigation }) {
                 setMangerStatus('idle');
             }
 
+            //connect to device w
             if (device.name === "MAT") {
-                //setDevice(device)
-                manager.stopDeviceScan();
-                ConnectToDevice(device.id)
+                manager.stopDeviceScan();//if device found stop device scan
+                ConnectToDevice(device.id);//move to device connection
             }
 
         });
@@ -116,51 +107,58 @@ export default function Login({ navigation }) {
     async function ConnectToDevice(id) {
 
         console.log('connecting..');
+        //async function connect to device with previusly found id  
         await manager.connectToDevice(id, { autoConnect: true })
-            .then((d) => {
+            .then((d) => {//on success return a Promise with A connected device
                 (async () => {
-                    setMangerStatus('connected');
+                    setMangerStatus('connected');//keep track of manager status
                     console.log("discover services....");
-                    d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
-                    const serv = await manager.servicesForDevice(id)
-                    
+                    d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)//discover services and chars of device
+                    const serv = await manager.servicesForDevice(id)//get all services of device
+
                     //setDevice(d);
                     //setServices(serv);
 
-                    BLECtx.dispatch({ type: 'device', value: d })
-                    BLECtx.dispatch({ type: 'services', value: serv })
-                    setIs_device_connected(true);
+                    BLECtx.dispatch({ type: 'device', value: d })//set device on global state -- useReducer ;similar to Redux;
+                    BLECtx.dispatch({ type: 'services', value: serv })//set services on global state -- useReducer ;similar to Redux;
+                    setIs_device_connected(true);//notify components that device is connected.
 
+                    //on device connection add subscription/event listner to notify on disconnection.
                     const disconnect_subscription = manager.onDeviceDisconnected(d.id, (err, device) => {
                         console.log("disconnect event ");
-                        setMangerStatus('idle')
-                        setIs_device_connected(false);
-                        disconnect_subscription.remove();
+                        setMangerStatus('idle')//keep track of manager status
+                        setIs_device_connected(false);//notify components that device has been disconnected
+                        BLECtx.dispatch({ type: 'logout' });
+                        disconnect_subscription.remove();//remove event listner when disconnect.
                     })
 
                     //console.log("serv 2 ==== ", serv[2]);
 
-                })().catch((err) => { console.log("CATCH DISCOVER SERVICES =========== " + err); });
+                })().catch((err) => {
+                    console.log("CATCH DISCOVER SERVICES =========== " + err);
+                });//error notify
             })
             .catch((err) => {
                 setMangerStatus('idle');
                 console.log('CATCH CONNETCT TO DEV ====' + JSON.stringify(err))
-            })
+            })//error notify
     }
 
     async function SignInUserData() {
 
-        let response;
-        let char_uuid = "a0b10004-e8f2-537e-4f6c-d104768a1214";
-        let auth_service_uuid = AUTH_SERVICE;
-        let auth_service = BLECtx.state.services.find(s => s.uuid === auth_service_uuid)
+        setErrText("");
+        //search for pre-defined BLE service from Services array
+        let auth_service = BLECtx.state.services.find(s => s.uuid === AUTH_SERVICE)
+        //set MAT device on scope variable
         let device = BLECtx.state.device;
 
+        //error handling
         if (auth_service === undefined) {
             console.log("SignInUserData func === AUTH SERVICE UNDEFINED");
             return;
         }
 
+        //discover Service Characteristics
         await auth_service.characteristics().then(
             res => {
 
@@ -168,25 +166,38 @@ export default function Login({ navigation }) {
                     "username": username,
                     "password": password
                 }
+
                 console.log("DATA TO SEND =====", JSON.stringify(data));
+                //encode user details to Uint8Array 
                 let msg = encoder.encode(JSON.stringify(data));
-                let user_data_char = res.find(c => c.uuid === char_uuid);
+                //scan the discoverd Characteristics array for a specific Characteristic using UUID
+                let user_data_char = res.find(c => c.uuid === USEDATA_LOGIN_CHAR);//
 
-
-                device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
+                //send user details to MAT via discoverd Characteristic
+                device.writeCharacteristicWithResponseForService(
+                    auth_service.uuid,
+                    user_data_char.uuid,
+                    Buffer.from(msg).toString('base64'))//using a buffer to send and convert Uint8Array to base64 encoding 
                     .then(res => {
-
+                        let value;
+                        //reading MAT response
                         user_data_char.read().then(res => {
-                            response = base64.decode(res.value);
-                            console.log("user_data_char.read()=====", response);
-                        }).finally(() => {
-                            if (response === "true") {
+                            value = base64.decode(res.value);// decoding the result
+                            console.log("user_data_char.read()=====", value);
+                        }).finally(() => { //the 'finally' step is critical in order
+                                            // to process the result after its arrivel and not before.
+                            console.log("finally -  value",value);
+                            if (value === "true") {
                                 console.log("LOGIN SUCCESS");
-                                navigation.navigate('Main');
+                                navigation.navigate('Main');//navigate to main if data is correct
+                            }
+                            else if(value === "unregisterd"){
+                                console.log("NO registerd");
                             }
                             else {
-                                console.log(response, " INCORRECT");
-                                return false;
+                                console.log(value, " INCORRECT");
+                                setErrText("login failed, enter valid details.")
+                                //return false;
                             }
                         })
 
@@ -198,30 +209,43 @@ export default function Login({ navigation }) {
         return false;
     }
 
+    async function ConnectedDevices(){
+
+        console.log('ConnectedDevices');
+        await manager.connectedDevices([AUTH_SERVICE]).then(devices=>{
+            console.log('devices',devices);
+            devices.forEach(d=>{
+                console.log(d);
+                if(d.name =="MAT")
+                    BLECtx.dispatch({type:'device',value:d})
+            })
+        })
+
+    }
+
     function Disconnect() {
 
-        let dev = BLECtx.state.device;
-        if (dev !== undefined) {
 
             try {
-                dev.cancelConnection().then(dev=>{
+                let id = BLECtx.state.device.id;
+                manager.cancelDeviceConnection(id).then(dev => {
                     setIs_device_connected(false);
                     setMangerStatus('idle');
-    
+
                 }).catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
 
             } catch (error) {
                 console.log("CATCH dissconect error =======" + JSON.stringify(error));
             }
-        }
     }
 
 
 
     return (
         <View style={styles.container}>
+            {console.log(manager_status)}
             <Header />
-            <Form setUsername={setUsername} setPassword={setPassword} />
+            <Form setUsername={setUsername} setPassword={setPassword} err_text={err_text} />
             <View style={styles.btns_cont}>
                 <Button
                     color="black"
@@ -230,15 +254,17 @@ export default function Login({ navigation }) {
                     style={styles.login_btn}
                     labelStyle={styles.label_login_btn}
                     disabled={manager_status == "scanning" || BTstate == "PoweredOff"}
-                    onPress={is_device_connected ? SignInUserData : ScanAndConnect} >
+                    onPress={is_device_connected ? SignInUserData : ScanAndConnect}
+                    //onPress={() => { navigation.navigate("Main") }}
+                >
                     <Text style>{manager_status == "scanning" ? "SCANNING" : is_device_connected ? "LOGIN" : "SCAN"}</Text>
                 </Button>
                 <SignUpBiometric
                     connected={is_device_connected}
                     //SignUp={RegisterBiometric}
                     //signUpValue={biometric_signup}
-                    username= {{username,setUsername}}
-                    password = {{password,setPassword}}
+                    username={{ username, setUsername }}
+                    password={{ password, setPassword }}
                     navigate2main={() => { navigation.navigate("Main") }}
                     visibility={biometricVisibility}
                     setVisibilty={setBiometricVisibilty} />

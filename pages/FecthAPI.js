@@ -1,0 +1,1 @@
+export const API_CHECK_USER = "http://proj8.ruppin-tech.co.il/api/Owner/Check_owner"

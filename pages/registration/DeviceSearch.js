@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { Animated, StyleSheet, Text, View, Dimensions, PermissionsAndroid, Platform, Alert, ToastAndroid, useWindowDimensions } from 'react-native';
+import { Animated, StyleSheet, Text, View, ToastAndroid } from 'react-native';
 import { Button } from 'react-native-paper'
 
 import { BleManager, Service } from 'react-native-ble-plx';
@@ -16,7 +16,8 @@ import { UserContext } from './Register';
 import { BLEcontext } from '../../App';
 
 import ScanAnimation from './ScanAnimation';
-import { AUTH_SERVICE, REGISTER_CHAR } from '../ServicesAndCharacteristics';
+import { AUTH_SERVICE, INIT_CODE_CHAR, REGISTER_CHAR } from '../ServicesAndCharacteristics';
+import { Provider } from 'react-native-paper/lib/typescript/core/settings';
 
 
 const encoder = new encoding.TextEncoder();
@@ -26,17 +27,17 @@ const decoder = new encoding.TextDecoder();
 export default function DeviceSearch({ navigation }) {
 
 
-
     const userCtx = useContext(UserContext);
     const BLEctx = useContext(BLEcontext);
+
+    const scan_start_time = new Date();
 
     //const [services, setServices] = useState([new Service()]);
     const [BTstate, setBtstate] = useState();
     //const [device, setDevice] = useState();
     const [init_code, setInitCode] = useState("");
-    const [code_dialog_visible, setCodeDialogVisible] = useState(false);
-    const [is_device_connected, setIs_device_connected] = useState(false,()=>{
-        if(!is_device_connected)
+    const [is_device_connected, setIs_device_connected] = useState(false, () => {
+        if (!is_device_connected)
             ScanAndConnect();
     });
 
@@ -44,14 +45,20 @@ export default function DeviceSearch({ navigation }) {
     useEffect(() => {
         if (!manager)
             manager = new BleManager();
-        manager.state().then((s) => {
-            if (s === 'PoweredOn')
-                ScanAndConnect();
 
+        if (BLEctx.state.device !== undefined) {
+            setIs_device_connected(true);
+        }
+
+        manager.state().then((s) => {
+            if (s === 'PoweredOn' && !is_device_connected)
+                ScanAndConnect();
             setBtstate(s);
-            console.log("BT state, DeviceSearch", s);
         }).catch((err) => { console.log("state error ------- " + JSON.stringify(err)); })
 
+        return () => {
+            manager.stopDeviceScan();
+        }
     }, [])
 
     useEffect(() => {
@@ -63,14 +70,17 @@ export default function DeviceSearch({ navigation }) {
             }
 
         }, true);
-        return () => subscription.remove();
+        return () => {
+            manager.stopDeviceScan();
+            subscription.remove()
+        }
     }, [manager]);
 
 
     async function ScanAndConnect() {
 
-        await manager.startDeviceScan(null, null, (error, device) => {
-
+        await manager.startDeviceScan([AUTH_SERVICE], null, (error, device) => {
+            let scan_end_time = new Date();
             console.log("scanning");
             if (error) {
                 console.log('ScanAndConnect error ============' + error.message);
@@ -79,12 +89,13 @@ export default function DeviceSearch({ navigation }) {
             }
 
             if (device.name === "MAT") {
-                manager.stopDeviceScan();
+
                 BLEctx.dispatch({ type: "device", value: device })
                 console.log("ScanAndConnect func, Device ID = " + device.id);
-
+                manager.stopDeviceScan();
                 ConnectToDevice(device.id)
             }
+
         });
 
     }
@@ -96,27 +107,26 @@ export default function DeviceSearch({ navigation }) {
             .then((d) => {
                 (async () => {
                     console.log("discover services....");
-                    setIs_device_connected(true);
-                    //d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
-                    const serv = await manager.servicesForDevice(id)
-                    //setDevice(d);
-                    //setServices(serv);
-                    console.log(serv[0]);
-                    BLEctx.dispatch({ type: 'device', value: d })
-                    BLEctx.dispatch({ type: 'services', value: serv })
+                    d = await manager.discoverAllServicesAndCharacteristicsForDevice(id)
+                    await d.services().then(serv => {
+
+                        console.log(serv[0].id);
+                        BLEctx.dispatch({ type: 'device', value: d })
+                        BLEctx.dispatch({ type: 'services', value: serv })
+                        setIs_device_connected(true);
+                    })
+
+
 
                 })().catch((err) => { console.log("CATCH DISCOVER SERVICES ===== " + err); });
             })
             .catch((err) => { console.log('CATCH CONNETCT TO DEV ====' + JSON.stringify(err)) })
     }
 
-
     async function SendUserData() {
         let response;
-        let char_uuid = REGISTER_CHAR;
-        let auth_service_uuid = AUTH_SERVICE;
-
-        let auth_service = BLEctx.state.services.find(s => s.uuid === auth_service_uuid)
+        const device = BLEctx.state.device;
+        let auth_service = BLEctx.state.services.find(s => s.uuid === AUTH_SERVICE)
 
         if (auth_service === undefined) {
             console.log("AUTH SERVICE UNDEFINED");
@@ -129,11 +139,11 @@ export default function DeviceSearch({ navigation }) {
                 let data = {
                     "username": userCtx.state.username,
                     "password": userCtx.state.password,
-                    "uuid": userCtx.state.uuid
+                    "first_name": userCtx.state.first_name
                 }
 
                 let msg = encoder.encode(JSON.stringify(data));
-                let user_data_char = res.find(c => c.uuid === char_uuid);
+                let user_data_char = res.find(c => c.uuid === REGISTER_CHAR);
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, res[0].uuid, Buffer.from(msg).toString('base64'))
                     .then(res => {
@@ -141,8 +151,14 @@ export default function DeviceSearch({ navigation }) {
                             user_data_char.read().then(res => {
                                 response = base64.decode(res.value);
                                 console.log(response);
-                            }).finally(() => { 
-
+                            }).finally(() => {
+                                if (response = "true"){
+                                    ToastAndroid.show("Registration completed.",ToastAndroid.LONG)
+                                    navigation.navigate("Login")
+                                }
+                                else {
+                                    ToastAndroid.show("Something went wrong..",ToastAndroid.LONG)
+                                }
                             })
                         }
                         console.log("WRITE DATA ", res.value);
@@ -156,10 +172,7 @@ export default function DeviceSearch({ navigation }) {
     async function SendMATcode() {
 
         let response;
-        let char_uuid = "a0b10003-e8f2-537e-4f6c-d104768a1214";
-        let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
-        
-        let auth_service = BLEctx.state.services.find(s => s.uuid === auth_service_uuid)
+        let auth_service = BLEctx.state.services.find(s => s.uuid === AUTH_SERVICE)
 
         if (auth_service === undefined) {
             console.log("AUTH SERVICE UNDEFINED");
@@ -170,7 +183,7 @@ export default function DeviceSearch({ navigation }) {
             res => {
                 //console.log("CHARS ", res);
                 let msg = encoder.encode(init_code);
-                let code_char = res.find(c => c.uuid === char_uuid);
+                let code_char = res.find(c => c.uuid === INIT_CODE_CHAR);
                 let device = BLEctx.state.device;
 
                 device.writeCharacteristicWithResponseForService(auth_service.uuid, code_char.uuid, Buffer.from(msg).toString('base64'))
@@ -179,16 +192,13 @@ export default function DeviceSearch({ navigation }) {
 
                         code_char.read().then(res => {
                             response = base64.decode(res.value);
-                            console.log("FIRST RESPONSE ===== ", response);
                         }).finally(() => {
-                            if (response === "true") {
-                                console.log("res == true");
+                            console.log("res ==", response);
 
-                                //setCodeDialogVisible(false);
+                            if (response === "true") {
                                 SendUserData();
                             }
                             else {
-                                console.log("res == false", response);
                                 userCtx.dispatch({ type: "mat_code", value: false })
                             }
 
@@ -198,6 +208,7 @@ export default function DeviceSearch({ navigation }) {
     }
 
     function handleCancel() {
+        console.log('handleCancel');
         navigation.navigate("Login")
     }
 
@@ -208,16 +219,15 @@ export default function DeviceSearch({ navigation }) {
 
         <View style={styles.container}>
             <Text style={styles.title}> device scan </Text>
-            <Text>turn MAT on.</Text>
             {is_device_connected ?
-             <MATCodeDialog
-                is_device_connected={is_device_connected}
-                setIs_device_connected={setIs_device_connected}
-                init_code={init_code}
-                setInitCode={setInitCode}
-                SendMATcode={SendMATcode} />
-                 :
-                 <ScanAnimation />}
+                <MATCodeDialog
+                    is_device_connected={is_device_connected}
+                    setIs_device_connected={setIs_device_connected}
+                    init_code={init_code}
+                    setInitCode={setInitCode}
+                    SendMATcode={SendMATcode} />
+                :
+                <ScanAnimation />}
 
             <BluetoothOffDialog BTstate={BTstate} handleCancel={handleCancel} />
 

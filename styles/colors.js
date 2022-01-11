@@ -4,6 +4,7 @@ export const WHITE = '#FFFFFF';
 export const BLACK = '#000000';
 export const BACKROUND = '#e9c46a';
 export const TITLE_SHADOW = '#2a9d8f';
+export const TITLE_SHADOW_DARK = "#264653"
 export const light_grey = '#999999';
 export const light_black = '#4d4d4d';
 export const tab_backround = "#e9d8a6";

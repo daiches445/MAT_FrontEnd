@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { View, Button, ToastAndroid } from 'react-native';
+import { View, Button, ToastAndroid,StyleSheet } from 'react-native';
 import Dialog from "react-native-dialog";
 import ShakeText from 'react-native-shake-text';
 
@@ -8,10 +8,19 @@ import { manager } from '../../App';
 
 import { UserContext } from './Register';
 import { BLEcontext } from '../../App';
+import { TEXT_coolvetica_rg, TEXT_Mohave, TITLE_big_noodle_titling } from '../../styles/typography';
+import { useNavigation } from '@react-navigation/native';
+import { encode } from 'react-native-base64';
+import { AUTH_SERVICE, INIT_CODE_CHAR } from '../ServicesAndCharacteristics';
+import * as encoding from 'text-encoding';
+
+const encoder = new encoding.TextEncoder();
+
+
 
 export default function MATCodeDialog(props) {
 
-
+    const navigation = useNavigation();
     const userCtx = useContext(UserContext);
     const BLEctx = useContext(BLEcontext);
 
@@ -31,15 +40,17 @@ export default function MATCodeDialog(props) {
             return;
         }
         //userCtx.dispatch({ type: "mat_code", value: props.init_code })
-        SendMATcode()
+        props.SendMATcode()
     }
+
+
 
     async function SendMATcode() {
 
+
         let response;
-        let char_uuid = "a0b10003-e8f2-537e-4f6c-d104768a1214";
-        let auth_service_uuid = "a0b10000-e8f2-537e-4f6c-d104768a1214";
-        //let serv = services;
+        let char_uuid = INIT_CODE_CHAR;
+        let auth_service_uuid = AUTH_SERVICE;
         let auth_service = BLEctx.state.services.find(s => s.uuid === auth_service_uuid)
         let device = BLEctx.state.device;
 
@@ -52,6 +63,7 @@ export default function MATCodeDialog(props) {
             res => {
                 //console.log("CHARS ", res);
                 let msg = encoder.encode(init_code);
+                console.log('encode msg',msg);
                 let init_code_char = res.find(c => c.uuid === char_uuid);
 
                 manager.writeCharacteristicWithResponseForDevice(device.id, init_code_char.uuid, Buffer.from(msg).toString('base64'))
@@ -77,7 +89,7 @@ export default function MATCodeDialog(props) {
             }).catch(err => { console.log("CATCH CHARS ERR ======== ", err) });
     }
 
-    function Disconnect() {
+    function handleCancel() {
         console.log('disconect');
         if (BLEctx.state.device === null) {
             console.log("device undifined");
@@ -87,6 +99,7 @@ export default function MATCodeDialog(props) {
 
         try {
             BLEctx.state.device.cancelConnection().catch((err) => { "disconnection err ocuured  =========" + JSON.stringify(err) })
+            navigation.goBack();
 
         } catch (error) {
             console.log("CATCH dissconect error =======" + JSON.stringify(error));
@@ -96,10 +109,9 @@ export default function MATCodeDialog(props) {
 
     return (
         <View >
-            <Button title="Show dialog" onPress={() => { props.setVisible(!props.visible) }} />
             <Dialog.Container visible={props.is_device_connected}>
-                <Dialog.Title>Enter MAT code</Dialog.Title>
-                <Dialog.Description>
+                <Dialog.Title style={styles.title}>Enter MAT code</Dialog.Title>
+                <Dialog.Description style={styles.description}>
                     Enter the 8 digit code printed inside the MAT controller package.
                 </Dialog.Description>
                 <Dialog.Input maxLength={8} onChangeText={props.setInitCode} />
@@ -107,8 +119,17 @@ export default function MATCodeDialog(props) {
                     <ShakeText>{userCtx.state.mat_code ? "" : "Invalid code Please try again"}</ShakeText>
                 </Dialog.Description>
                 <Dialog.Button label="Send" onPress={handleCodeSend} />
-                <Dialog.Button label="Cancel" onPress={Disconnect} />
+                <Dialog.Button label="Cancel" onPress={handleCancel} />
             </Dialog.Container>
         </View>
     )
 }
+
+const styles = StyleSheet.create({
+    title:{
+        fontFamily:TITLE_big_noodle_titling,
+    },
+    description:{
+        fontFamily:TEXT_Mohave
+    }
+})

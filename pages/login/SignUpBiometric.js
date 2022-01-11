@@ -21,18 +21,25 @@ const decoder = new encoding.TextDecoder();
 
 export default function SignUpBiometric(props) {
 
+    //consts using useRef hook with an Animated value for error text animation.
     const shake_text_ref = useRef(new Animated.Value(0)).current;
     const opacity_text_ref = useRef(new Animated.Value(0)).current;
 
+    //getting the global state - simillar to Redux
     const BLEctx = useContext(BLEcontext);
+
     const [username, setUsername] = useState('init_user');
     const [password, setPassword] = useState('init_pass');
     const [err_msg, setErrMsg] = useState('');
+    //pre saved user credentials if fingerprint was registerd
     const [credentials, setCredentials] = useState();
     const [loading, setLoading] = useState(false);
 
+    //useEffect function to run once on component mount - one time only.
     useEffect(async () => {
-        await Keychain.resetGenericPassword();
+        //await Keychain.resetGenericPassword();
+
+        //check if user has registerd a fingerprint.
         const GetUserData = async () => {
             const credentials = await Keychain.getGenericPassword();
             setCredentials(credentials);
@@ -45,7 +52,10 @@ export default function SignUpBiometric(props) {
         }
     }, [])
 
+    //useEffect with a prop dependency - will run when on prop update.
     useEffect(async () => {
+        //when device has been recognized and connected on parent component
+        //check if user has credentails and call biometric pop-up
         if (props.connected) {
             if (credentials) {
                 BiometricAccess();
@@ -54,9 +64,15 @@ export default function SignUpBiometric(props) {
     }, [props.connected])
 
     function AnimateErrorText() {
+        //create a shake effect on text error component when login failed.
 
+        //reset initial value.                               
         shake_text_ref.setValue(0);
+
+        //call two Animations together
         Animated.parallel([
+            //a 'spring' type animation that will change graduatlly the value to new one.
+            //also define the spring behiavior by the using the 'damping' setting
             Animated.spring(shake_text_ref, {
                 damping: 10,
                 useNativeDriver: true,
@@ -72,12 +88,17 @@ export default function SignUpBiometric(props) {
 
 
     async function BiometricAccess() {
+        //this function calls the fingerprint scanner popup
         console.log("BiometricAccess start");
+
+
         FingerprintScanner.release();
-        FingerprintScanner.authenticate({ description: 'Scan your fingerprint on the device scanner to continue' })
+        await FingerprintScanner.authenticate({ description: 'Scan your fingerprint on the device scanner to continue' })
             .then(async () => {
+                
+                //if fingerprint is correct - get the username and password from the pre saved credentials.
                 console.log("BiometricAccess FingerprintScanner");
-                setPassword(credentials.username);
+                setUsername(credentials.username);
                 setPassword(credentials.password);
                 SignIn()
             }).
@@ -89,75 +110,97 @@ export default function SignUpBiometric(props) {
     }
 
     async function SetKeychain() {
-        setLoading(true);
-        FingerprintScanner.authenticate({ description: 'Scan your fingerprint on the device scanner to continue'})
+
+        FingerprintScanner.authenticate({ description: 'Scan your fingerprint on the device scanner to continue' })
             .then(async () => {
-                await Keychain.setGenericPassword(username, password, { accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE })
+                setLoading(true);
+                await Keychain.setGenericPassword(username, password,
+                    { accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE })
                     .then(res => {
                         if (res) {
-                            ToastAndroid.show("Biometric access achived.", ToastAndroid.LONG);
-                            setLoading(false);
-                            props.navigate2main();
-                        }
-                        else
+                            Promise.resolve();
+                        } else {
                             setErrMsg("Unable to register user details.")
-                        AnimateErrorText();
+                            AnimateErrorText();
+                            Promise.reject("keychain error")
+                        }
+                    }).then(() => {
+                        ToastAndroid.show("Biometric access granted.", ToastAndroid.LONG);
+                        setLoading(false);
+                        props.navigate2main();
+                    }).catch(err => {
+                        console.log(err);
                     })
-            }).catch(err => {
-                console.log(err)
             })
+
+
     }
 
     async function SignIn(user_data) {
+        //let response;
 
+        //set MAT device on scope variable
         let device = BLEctx.state.device;
-        let response;
-        let char_uuid = USEDATA_LOGIN_CHAR;
-        let auth_service_uuid = AUTH_SERVICE;
-        let auth_service = BLEctx.state.services.find(s => s.uuid === auth_service_uuid)
+        //search for pre-defined BLE service from Services array
+        let auth_service = BLEctx.state.services.find(s => s.uuid === AUTH_SERVICE)
 
+        //error handling
         if (auth_service === undefined) {
             console.log("RegisterBiometric func == AUTH SERVICE UNDEFINED");
             return;
         }
 
+        //discover Service Characteristics
         await auth_service.characteristics().then(
             res => {
+
+                //encode user details to Uint8Array 
                 let msg = encoder.encode(JSON.stringify({ username, password }));
-                let user_data_char = res.find(c => c.uuid === char_uuid);
+                //scan the discoverd Characteristics array for a specific Characteristic using UUID                
+                let user_data_char = res.find(c => c.uuid === USEDATA_LOGIN_CHAR);
 
-                device.writeCharacteristicWithResponseForService(auth_service.uuid, user_data_char.uuid, Buffer.from(msg).toString('base64'))
+                //send user details to MAT via discoverd Characteristic
+                device.writeCharacteristicWithResponseForService(
+                    auth_service.uuid,
+                    user_data_char.uuid,
+                    Buffer.from(msg).toString('base64'))//using a buffer to send and convert Uint8Array to base64 encoding
                     .then(res => {
-
+                        let val;
+                        //reading MAT response
                         user_data_char.read().then(res => {
-                            response = base64.decode(res.value);
-                            console.log("user_data_char.read()=====", response);
-                        }).finally(async () => {
-                            console.log("LOG FORM FINALLY AFTER READ", response);
+                            val= base64.decode(res.value);// decoding the result
+                            console.log("user_data_char.read()=====", val);
+                        }).finally(async () => {//the 'finally' step is critical in order
+                                                    // to process the result after its arrivel and not before.
 
-                            if (response === "true") {
-                                if (!credentials) {
-                                    await SetKeychain();
+                            console.log("LOG FORM FINALLY AFTER READ", val);
+
+                            if (val === "true") {//if the user details are correct
+
+                                if (!credentials) {      //if user DONT have a registerd fingerprint
+                                    
+                                    await SetKeychain();//then call the function that will handle the registration
                                 }
-                                else {
+                                else {//if user HAS a registerd fingerprint
                                     props.navigate2main();
                                 }
                             }
-                            else {
-                                setErrMsg("Invalid user details.");
-                                AnimateErrorText();
-                                console.log(response, " INCORRECT");
+                            else if (val == "unregisterd") {//if MAT hasnt been activated 
+                                setErrMsg("Unregisterd device.");
                             }
+                            else {
+                                setErrMsg("Invalid user details.");//if user details are incorrect
+                                console.log(val, " INCORRECT");
+                            }
+                            AnimateErrorText();
+
                         })
 
                     }).catch(err => {
-                        //setBiometricSignup({ res: false, value: "CATCH WRITE DATE" });
                         console.log("CATCH WRITE DATE  ", err);
                     });
-                //setCharacteristics(res)
 
             }).catch(err => {
-                //setBiometricSignup({ res: false, value: err });
                 console.log("CATCH CHARS ERR ======== ", err)
             });
 
@@ -167,37 +210,38 @@ export default function SignUpBiometric(props) {
 
 
     async function handlePress() {
+        //handle the 'fingerprint' button press
 
-        if (!props.connected) {
+
+        //if a device is not connected OR the user dont hav ebiometric crednetials
+        //the show pop-up.(if a device isnt connected a differnt dialog will be shown)
+        FingerprintScanner.release();
+        if (!props.connected || !credentials) {
             props.setVisibilty(true)
-            return;
         }
-        if (credentials) {
-            await FingerprintScanner.authenticate({ description: 'Scan your fingerprint on the device scanner to continue' })
-                .then(() => {
-                    BiometricAccess();
-                }).catch(err => { console.log(err) })
+        else if (credentials) {//if user has biometric credintials the call the the finger print pop-up
+            BiometricAccess();//call the fingerprint prompt
         }
-        else {
-            props.setVisibilty(true);
-        }
+
     }
 
     return (
         <View style={{}}>
-            <Ionicons.Button
+            <Ionicons.Button //'Fingerprint' button
                 iconStyle={{ left: 4 }}
                 style={styles.biometric_btn}
                 name="finger-print"
                 size={40}
+                disabled = {!props.connected}
                 onPress={handlePress}
             />
-            {props.connected ? (
-                loading ? (
+            {props.connected ? (//if MAT is connected
+                loading ? (//when setting a new Keychain credentials
                     <Dialog.Container>
-                        <Dialog.Title>loading</Dialog.Title>
+                        <Dialog.Title>please wait</Dialog.Title>
+                        <ActivityIndicator animating={loading} />
                     </Dialog.Container>
-                ) :
+                ) ://Main dialog for registration
                     <Dialog.Container contentStyle={{ margin: 10 }} visible={props.visibility}>
                         <Dialog.Title>Add Fingerprint</Dialog.Title>
                         <Dialog.Description>Enter your user details </Dialog.Description>
@@ -207,7 +251,7 @@ export default function SignUpBiometric(props) {
                         <Dialog.Button label="Send" onPress={SignIn} />
                         <Dialog.Button label="Cancel" onPress={() => { props.setVisibilty(false) }} />
                     </Dialog.Container>)
-                :
+                ://if MAT isnt connect when user presses on the 'Fingerprint' button.
                 (<Dialog.Container contentStyle={{ margin: 10 }} visible={props.visibility}>
                     <Dialog.Title>MAT unavilable</Dialog.Title>
                     <Ionicons style={styles.bt_logo} size={60} name="bluetooth" />

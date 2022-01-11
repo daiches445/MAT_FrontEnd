@@ -9,16 +9,21 @@ import Home from './Home';
 import Stats from './Stats';
 
 import * as colors from '../../styles/colors';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function Main() {
     return (
         <Tab.Navigator
-
+            
             initialRouteName='Home'
             screenOptions={
-                { headerShown: false, tabBarStyle: { backgroundColor: colors.PRIMARY } }}>
+                {
+                    headerShown: false,
+                    tabBarStyle: { backgroundColor: colors.PRIMARY },
+                }}>
+            
             <Tab.Screen name="Home" component={Home}
                 options={{
                     tabBarLabel: "Home",
