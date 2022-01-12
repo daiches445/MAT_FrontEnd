@@ -1,8 +1,7 @@
 
 
 <h1 align="center">MAT</h1>.<br>
-<h2 align="center">Based on an Arduino Nano BLE 33 hooked to a motorcycle electrical system,<br> MAT adds Bluetooth connectivity that allows
-owner control over the ignition switch by a mobile app.</h2><br>
+<h2 align="center">Based on an Arduino Nano BLE 33 hooked to a motorcycle electrical system,<br> MAT adds Bluetooth control over the ignition switch using a React-native mobile app.</h2><br>
 
 <h3 align="center">https://youtu.be/HEf0TSM-v6A</h3>
 
